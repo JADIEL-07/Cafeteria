@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Datos locales de la aplicación (base de datos y clave de sesión)
+instance/

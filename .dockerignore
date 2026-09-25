@@ -1,0 +1,37 @@
+# Secretos: nunca deben entrar en la imagen (se pasan como variables de entorno)
+.env
+.env.*
+
+# Control de versiones y CI
+.git
+.gitignore
+.github
+.claude
+
+# Datos locales (SQLite y clave de sesión de tu máquina)
+instance/
+
+# Copia anidada del repositorio, si existe
+Cafeteria/
+
+# Pruebas y herramientas de desarrollo
+tests/
+conftest.py
+pytest.ini
+pyproject.toml
+requirements-dev.txt
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Basura de Python
+**/__pycache__
+**/*.pyc
+
+# Documentación y archivos de Docker
+README.md
+Dockerfile
+docker-compose.yml
+.dockerignore

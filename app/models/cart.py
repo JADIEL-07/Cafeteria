@@ -85,7 +85,7 @@ class Cart:
         if not isinstance(data, dict):
             data = {}
         return {
-            "lines": [l for l in data.get("lines", []) if isinstance(l, dict)],
+            "lines": [row for row in data.get("lines", []) if isinstance(row, dict)],
             "coupon": data.get("coupon"),
             "mode": data.get("mode") if data.get("mode") in FULFILLMENT_LABELS else FULFILL_BAR,
             "table": str(data.get("table") or "")[:10],
@@ -99,7 +99,7 @@ class Cart:
 
     def count(self):
         """Unidades en el carrito (para el globo del encabezado)."""
-        return sum(int(l.get("qty", 0)) for l in self._data()["lines"])
+        return sum(int(row.get("qty", 0)) for row in self._data()["lines"])
 
     def mode_info(self):
         """(modo de entrega, número de mesa) sin valorizar el carrito."""
@@ -169,7 +169,7 @@ class Cart:
         data = self._data()
         qty = max(0, min(int(qty), MAX_LINE_QTY))
         data["lines"] = [
-            {**l, "qty": qty} if l.get("key") == key else l for l in data["lines"] if not (l.get("key") == key and qty == 0)
+            {**row, "qty": qty} if row.get("key") == key else row for row in data["lines"] if not (row.get("key") == key and qty == 0)
         ]
         self._save(data)
 
@@ -181,7 +181,7 @@ class Cart:
 
     def remove(self, key):
         data = self._data()
-        data["lines"] = [l for l in data["lines"] if l.get("key") != key]
+        data["lines"] = [row for row in data["lines"] if row.get("key") != key]
         self._save(data)
 
     def set_mode(self, mode, table=""):
@@ -233,7 +233,7 @@ class Cart:
                     unit_cents=unit,
                 )
             )
-        subtotal = sum(l.line_cents for l in lines)
+        subtotal = sum(line.line_cents for line in lines)
         coupon, coupon_error, discount = None, None, 0
         if data["coupon"]:
             candidate = Coupon.find(data["coupon"])

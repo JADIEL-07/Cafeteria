@@ -34,6 +34,7 @@ run.py                       punto de entrada
 app/
 ├── __init__.py              fábrica de la app (config, hooks, errores, CLI)
 ├── config.py                impuestos, comisión, datos del local, variables de entorno
+├── database.py              conexión SQLite / PostgreSQL (Supabase), arranque de tablas y RLS
 ├── seed.py                  catálogo, recetas, cuentas y datos demo
 ├── models/        (M)       entidades + reglas de negocio
 │   ├── user.py  product.py  inventory.py  order.py  ledger.py  cart.py  coupon.py  favorite.py
@@ -57,10 +58,10 @@ app/
     │   └── errors/
     └── static/              css/ · js/ · img/logo.svg · img/products/*.jpg
 conftest.py                  registra los fixtures de tests/fixtures
-tests/                       648 pruebas (pytest)
+tests/                       686 pruebas (pytest)
 ├── fixtures/                un módulo de fixtures por modelo (usuarios, catálogo, inventario, cupones, carritos, pedidos, cartera, favoritos)
 ├── models/                  pruebas unitarias, un archivo por modelo
-├── utils/                   dinero y fechas
+├── utils/                   dinero, fechas y capa de base de datos
 └── integration/             rutas HTTP, permisos, pantallas y robustez
 ```
 
@@ -91,6 +92,22 @@ Incluye periodos (hoy / semana / mes / todo), desglose tarjeta vs efectivo, arqu
 
 **Permisos** — cliente: tienda y sus pedidos · barista: pedidos e inventario · administrador: además cartera y usuarios.
 
+## Base de datos: SQLite o Supabase
+
+Por defecto la app usa **SQLite** (`instance/cafeteria.db`), sin configurar nada. Para usar **Supabase** (PostgreSQL administrado):
+
+1. En el panel de tu proyecto: **Connect → Connection string** → copia la de **Session pooler** (funciona por IPv4; la *Direct connection* sólo por IPv6). El pooler en modo transacción (puerto 6543) también sirve.
+2. Copia `.env.example` como `.env` y pega la cadena en `DATABASE_URL`, reemplazando `[YOUR-PASSWORD]` (si la contraseña tiene `@ : / # ? %`, escríbela codificada: `@` → `%40`). `.env` está en `.gitignore`: **la contraseña de tu base nunca debe subirse a git**.
+3. Instala las dependencias y arranca: `pip install -r requirements.txt` y `python run.py`. En el primer arranque se crean las tablas y se siembra el catálogo (y las cuentas) igual que con SQLite.
+
+Qué hace la app por ti con Postgres:
+- **Row Level Security activado en todas las tablas.** Supabase publica el esquema `public` por su API REST; sin RLS, quien tenga la clave pública (*anon key*) podría leer `users` (correos y hashes de contraseña). Con RLS y sin políticas esa API no ve nada; la app no la usa: se conecta con el usuario de la cadena (dueño de las tablas), que no queda sujeto a RLS. Se comprobó con un rol `anon` simulado.
+- Conexión cifrada (`sslmode=require`), *pre-ping* y reciclado del pool, y sin sentencias preparadas (compatible con el pooler de Supabase); pool pequeño (5 + 5) para el plan gratuito.
+- Creación de tablas con candado de asesoría: varios procesos (gunicorn) pueden arrancar a la vez sin pisarse.
+- `flask --app run reset-db` pide confirmación cuando la base no es SQLite (muestra a qué base apunta).
+
+Limitaciones: `create_all` sólo **crea tablas que faltan**; si más adelante cambias columnas necesitarás migraciones (Flask-Migrate/Alembic). Migrar los datos existentes de SQLite a Supabase no está automatizado (para un local nuevo basta el primer arranque).
+
 ## Cambios respecto a los diseños
 
 - Cada pantalla tenía una versión móvil y otra de escritorio: ahora es **una sola plantilla responsive** (barra inferior en móvil, cabecera/pie completos en escritorio).
@@ -103,15 +120,20 @@ Incluye periodos (hoy / semana / mes / todo), desglose tarjeta vs efectivo, arqu
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest                              # pruebas
+python -m pytest                              # pruebas (SQLite en memoria)
 python -m pytest --cov=app --cov-report=term-missing   # con cobertura
 python -m ruff check .                        # lint
+
+# contra PostgreSQL (el motor de Supabase). La base se VACÍA en cada prueba y su nombre debe contener "test":
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cafeteria_test python -m pytest
 ```
 
-En cada *push* y *pull request* GitHub Actions ejecuta el lint y las pruebas en Python 3.11, 3.12 y 3.13
+Las pruebas **nunca** usan `DATABASE_URL`, así que no pueden tocar tu base de Supabase por accidente.
+
+En cada *push* y *pull request* GitHub Actions ejecuta el lint, las pruebas en Python 3.11, 3.12 y 3.13 con SQLite, y toda la suite contra PostgreSQL 15 y 17
 (`.github/workflows/ci.yml`); Dependabot propone las actualizaciones de dependencias y de acciones.
 
-**Por modelo** (`tests/models/`, 513 pruebas): `User`, `Category`, `Product`, `Modifier`, `ProductIngredient`, `InventoryItem`, `InventoryMovement`, `Coupon`, `Favorite`, `Cart`, `LedgerEntry`, `Order` y `OrderItem`, más las bases comunes (`unit_of_work`, errores de dominio). Cada prueba corre en una base SQLite en memoria propia y con un hash de contraseña barato, así toda la suite tarda menos de un minuto.
+**Por modelo** (`tests/models/`, 515 pruebas): `User`, `Category`, `Product`, `Modifier`, `ProductIngredient`, `InventoryItem`, `InventoryMovement`, `Coupon`, `Favorite`, `Cart`, `LedgerEntry`, `Order` y `OrderItem`, más las bases comunes (`unit_of_work`, errores de dominio). Cada prueba corre en una base SQLite en memoria propia y con un hash de contraseña barato, así toda la suite tarda menos de un minuto.
 
 **Fixtures** (`tests/fixtures/`, uno por modelo) — se cargan desde el `conftest.py` de la raíz con `pytest_plugins` y se pueden combinar:
 
@@ -127,7 +149,7 @@ En cada *push* y *pull request* GitHub Actions ejecuta el lint y las pruebas en 
 | `ledger` | `sale_entry`, `refund_entry`, `purchase_entry`, `adjustment_in_entry`, `adjustment_out_entry`, `ledger_dataset` (con las cifras esperadas), `ledger_factory` |
 | `favorites` | `favorite`, `favorite_factory` |
 
-**Integración** (`tests/integration/`, 83 pruebas): carrito y precios, flujo completo de pedidos (incluida la regla de pago), inventario, cartera, permisos por rol, CSRF, redirecciones seguras, exportaciones CSV, el renderizado de todas las pantallas y una prueba de robustez que golpea cada ruta con datos basura (ninguna puede dar error 500).
+**Integración** (`tests/integration/`, 94 pruebas): carrito y precios, flujo completo de pedidos (incluida la regla de pago), inventario, cartera, permisos por rol, CSRF, redirecciones seguras, exportaciones CSV, el renderizado de todas las pantallas y una prueba de robustez que golpea cada ruta con datos basura y otra de entradas que PostgreSQL rechaza (byte NUL, valores fuera de rango): ninguna puede dar error 500.
 
 La cobertura ronda el **97 %** (modelos entre 98 y 100 %). El CI la publica como artefacto (`coverage-xml`).
 
@@ -135,4 +157,4 @@ La cobertura ronda el **97 %** (modelos entre 98 y 100 %). El CI la publica como
 
 - El **pago con tarjeta está simulado** (no hay pasarela real; no se pide ni guarda ningún dato de tarjeta). Conectar Stripe u otra pasarela iría en `Order.create_from_cart`.
 - Los granos se acumulan pero **no hay canje** todavía. Los productos, opciones y recetas se editan en `app/seed.py` (no hay pantalla de administración de catálogo).
-- Una sola sucursal, horas locales del servidor y SQLite (suficiente para una cafetería; para varias cajas concurrentes conviene PostgreSQL vía `DATABASE_URL`).
+- Una sola sucursal y horas locales del servidor. SQLite alcanza para una caja; para varias cajas concurrentes usa Supabase (ver arriba).

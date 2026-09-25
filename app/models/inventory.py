@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import func, or_, select
 
 from ..extensions import db
-from ..utils.money import line_cost
+from ..utils.money import MAX_CENTS, format_money, line_cost
 from .base import DomainError, InsufficientStock, unit_of_work
 from .ledger import LedgerEntry
 
@@ -216,6 +216,8 @@ class InventoryItem(db.Model):
             raise DomainError("El costo no puede ser negativo.")
         supplier = (supplier or "").strip() or self.supplier
         total = line_cost(qty, unit_cost_cents)
+        if total > MAX_CENTS:  # cantidad × costo puede desbordar la columna entera de PostgreSQL
+            raise DomainError(f"El total de la compra supera el máximo permitido ({format_money(MAX_CENTS)}).")
         self.stock = round(self.stock + qty, 3)
         self.unit_cost_cents = unit_cost_cents
         if supplier:

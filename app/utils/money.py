@@ -2,6 +2,7 @@
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 MAX_MONEY = Decimal("1000000")      # tope por importe: $1,000,000.00
+MAX_CENTS = int(MAX_MONEY * 100)    # el mismo tope en centavos (cabe de sobra en un INTEGER de 32 bits)
 MAX_QUANTITY = Decimal("1000000")   # tope por cantidad de stock
 
 

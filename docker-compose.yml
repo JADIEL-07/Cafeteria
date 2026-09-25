@@ -1,0 +1,22 @@
+# Levanta la cafetería con Docker:   docker compose up --build
+#
+# La configuración se lee de tu archivo .env (DATABASE_URL de Supabase, SECRET_KEY, ADMIN_PASSWORD…).
+# Sin DATABASE_URL usa SQLite dentro del volumen "instance" (los datos sobreviven a los reinicios).
+# En local sirve por HTTP: NO pongas CAFE_HTTPS=1 en el .env (esa opción es para cuando haya HTTPS delante).
+services:
+  web:
+    build: .
+    image: moka-cafe
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8000"
+    volumes:
+      - instance:/app/instance
+    restart: unless-stopped
+
+volumes:
+  instance:

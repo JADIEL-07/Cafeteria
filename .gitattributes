@@ -1,2 +1,6 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Estos archivos se ejecutan en Linux (contenedores, GitHub Actions): siempre con saltos de línea LF,
+# aunque en Windows git tenga autocrlf activado (un "\" de continuación seguido de CRLF rompe docker build).
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+*.yml           text eol=lf
+*.sh            text eol=lf

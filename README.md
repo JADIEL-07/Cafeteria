@@ -30,7 +30,8 @@ Tailwind y las fuentes se cargan por CDN (necesitan internet, igual que en tus d
 ## Estructura (MVC)
 
 ```
-run.py                       punto de entrada
+run.py                       punto de entrada (python run.py / gunicorn run:app)
+Dockerfile  docker-compose.yml   imagen de producción (gunicorn) y arranque local con Docker
 app/
 ├── __init__.py              fábrica de la app (config, hooks, errores, CLI)
 ├── config.py                impuestos, comisión, datos del local, variables de entorno
@@ -58,7 +59,7 @@ app/
     │   └── errors/
     └── static/              css/ · js/ · img/logo.svg · img/products/*.jpg
 conftest.py                  registra los fixtures de tests/fixtures
-tests/                       686 pruebas (pytest)
+tests/                       706 pruebas (pytest)
 ├── fixtures/                un módulo de fixtures por modelo (usuarios, catálogo, inventario, cupones, carritos, pedidos, cartera, favoritos)
 ├── models/                  pruebas unitarias, un archivo por modelo
 ├── utils/                   dinero, fechas y capa de base de datos
@@ -108,6 +109,33 @@ Qué hace la app por ti con Postgres:
 
 Limitaciones: `create_all` sólo **crea tablas que faltan**; si más adelante cambias columnas necesitarás migraciones (Flask-Migrate/Alembic). Migrar los datos existentes de SQLite a Supabase no está automatizado (para un local nuevo basta el primer arranque).
 
+## Despliegue con Docker
+
+La misma imagen sirve para probar en tu máquina y para publicarla en cualquier plataforma que ejecute contenedores (Render, Fly.io, Railway, Cloud Run, un VPS con Docker…). Corre con **gunicorn**, como usuario sin privilegios, y **no lleva tu `.env`**: la configuración entra por variables de entorno.
+
+```bash
+docker compose up --build          # http://localhost:8000  (lee tu .env; sin DATABASE_URL usa SQLite en un volumen)
+```
+
+```bash
+docker build -t moka-cafe .
+docker run -p 8000:8000 --env-file .env moka-cafe
+```
+
+| Variable | Para qué | Obligatoria en producción |
+| --- | --- | --- |
+| `DATABASE_URL` | Cadena de Supabase (Session pooler). Sin ella usa SQLite dentro del contenedor, que se pierde si la plataforma no tiene disco persistente | Sí |
+| `SECRET_KEY` | Firma las sesiones. Si no la defines se genera una dentro del contenedor y **cada reinicio cierra las sesiones** | Sí |
+| `ADMIN_PASSWORD` | Contraseña del administrador que se crea en el primer arranque (`ADMIN_EMAIL` es su correo) | Sí: con `CAFE_HTTPS=1` la app **se niega a arrancar** si se va a crear el admin con la contraseña por defecto |
+| `CAFE_HTTPS=1` | Cookies de sesión sólo por HTTPS | Sí, cuando haya HTTPS delante |
+| `CAFE_PROXY_HOPS=1` | Cuántos proxies de confianza hay delante (el balanceador de la plataforma). Sin esto todos los clientes parecen tener la IP del proxy y el límite de intentos de login se aplica a todos a la vez | Sí, detrás de un proxy |
+| `CAFE_DEMO_DATA=0` | No cargar clientes ni pedidos de ejemplo en el primer arranque | Recomendado |
+| `PORT` | Puerto de escucha (por omisión 8000; muchas plataformas lo definen solas) | No |
+| `WEB_CONCURRENCY`, `GUNICORN_THREADS` | Procesos (1) e hilos (4) de gunicorn. Cada proceso abre su propio pool de conexiones y tiene su propio límite de intentos de login: sube los hilos antes que los procesos | No |
+
+Para publicar: construye la imagen desde este repositorio (o conecta el repo a la plataforma, que usará el `Dockerfile`), define las variables de arriba **como secretos de la plataforma** (nunca en el código ni en la imagen) y configura el *health check* en `/healthz`, que responde 200 sólo si la app y su base de datos están vivas.
+Necesita ~512 MB de RAM (el hash de contraseñas `scrypt` usa memoria). El CI construye la imagen, la arranca contra SQLite y contra PostgreSQL y comprueba que corre sin root, sin `.env` ni tests y con RLS activado.
+
 ## Cambios respecto a los diseños
 
 - Cada pantalla tenía una versión móvil y otra de escritorio: ahora es **una sola plantilla responsive** (barra inferior en móvil, cabecera/pie completos en escritorio).
@@ -149,7 +177,7 @@ En cada *push* y *pull request* GitHub Actions ejecuta el lint, las pruebas en P
 | `ledger` | `sale_entry`, `refund_entry`, `purchase_entry`, `adjustment_in_entry`, `adjustment_out_entry`, `ledger_dataset` (con las cifras esperadas), `ledger_factory` |
 | `favorites` | `favorite`, `favorite_factory` |
 
-**Integración** (`tests/integration/`, 94 pruebas): carrito y precios, flujo completo de pedidos (incluida la regla de pago), inventario, cartera, permisos por rol, CSRF, redirecciones seguras, exportaciones CSV, el renderizado de todas las pantallas y una prueba de robustez que golpea cada ruta con datos basura y otra de entradas que PostgreSQL rechaza (byte NUL, valores fuera de rango): ninguna puede dar error 500.
+**Integración** (`tests/integration/`, 111 pruebas): carrito y precios, flujo completo de pedidos (incluida la regla de pago), inventario, cartera, permisos por rol, CSRF, redirecciones seguras, exportaciones CSV, el renderizado de todas las pantallas y una prueba de robustez que golpea cada ruta con datos basura y otra de entradas que PostgreSQL rechaza (byte NUL, valores fuera de rango): ninguna puede dar error 500. También cubren /healthz, el soporte de proxy y la guarda de la contraseña de admin.
 
 La cobertura ronda el **97 %** (modelos entre 98 y 100 %). El CI la publica como artefacto (`coverage-xml`).
 

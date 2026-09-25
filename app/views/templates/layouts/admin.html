@@ -1,0 +1,80 @@
+{% extends "layouts/base.html" %}
+{# Layout del panel: barra lateral + barra superior. El menú se pliega en pantallas pequeñas. #}
+{% block body_class %}min-h-screen bg-background font-body-md text-on-surface antialiased{% endblock %}
+
+{% block body %}
+{% set badges = admin_badges() %}
+{% set nav_items = [
+  ('pedidos', 'Pedidos en Espera', 'admin_orders.index', 'receipt_long', ['barista', 'admin']),
+  ('cartera', 'Cartera & Finanzas', 'admin_finance.index', 'payments', ['admin']),
+  ('inventario', 'Inventario & Obrador', 'admin_inventory.index', 'inventory_2', ['barista', 'admin']),
+  ('usuarios', 'Usuarios & Clientes', 'admin_users.index', 'groups', ['admin'])] %}
+
+<div id="sidebar-scrim" class="fixed inset-0 z-40 hidden bg-primary/40 lg:hidden no-print" data-sidebar-toggle></div>
+
+<aside id="admin-sidebar" class="no-print fixed left-0 top-0 z-50 flex h-full w-72 -translate-x-full flex-col justify-between overflow-y-auto bg-surface-container-low px-4 py-6 shadow-[0_1px_8px_rgba(61,39,29,0.04)] transition-transform duration-200 lg:translate-x-0" aria-label="Navegación del panel">
+  <div class="flex flex-col gap-6">
+    <a href="{{ url_for('admin_orders.index') }}" class="flex items-center gap-3 px-2">
+      <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="Logo" class="h-9 w-9 rounded-lg">
+      <div class="flex flex-col"><span class="font-headline-sm text-headline-sm leading-tight text-primary">{{ cafe.short_name }} Café</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">&amp; Bakery Backoffice</span></div>
+    </a>
+
+    <div class="flex items-center gap-3 rounded-xl bg-surface-container p-3">
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-container text-on-primary"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">local_cafe</span></div>
+      <div class="flex min-w-0 flex-col"><span class="truncate font-label-md text-label-md text-on-surface">{{ current_user.name }}</span><span class="truncate font-body-sm text-body-sm text-on-surface-variant">{{ current_user.role_label }}</span></div>
+    </div>
+
+    <nav class="flex flex-col gap-1.5" aria-label="Secciones">
+      {% for key, label, endpoint, glyph, roles in nav_items if current_user.role in roles %}
+        {% set on = admin_active == key %}
+        <a href="{{ url_for(endpoint) }}" {% if on %}aria-current="page"{% endif %}
+           class="flex items-center justify-between rounded-xl px-3.5 py-2.5 transition-colors {{ 'bg-primary text-on-primary shadow-[0_4px_16px_-2px_rgba(61,39,29,0.08)]' if on else 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface' }}">
+          <div class="flex items-center gap-3"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">{{ glyph }}</span><span class="font-label-md text-label-md {{ 'font-bold' if on }}">{{ label }}</span></div>
+          {% if key == 'pedidos' and badges.orders %}<span class="rounded-full bg-error px-2 py-0.5 font-label-sm text-label-sm text-on-error">{{ badges.orders }}</span>
+          {% elif key == 'inventario' and badges.low_stock %}<span class="rounded-full bg-secondary-fixed px-2 py-0.5 font-label-sm text-label-sm text-on-secondary-fixed">{{ badges.low_stock }} Bajo</span>{% endif %}
+        </a>
+      {% endfor %}
+    </nav>
+  </div>
+
+  <div class="flex flex-col gap-3 pt-4">
+    <div class="flex items-center justify-between rounded-xl bg-surface-container-lowest px-3 py-2">
+      <div class="flex items-center gap-2"><span class="h-2 w-2 animate-pulse rounded-full bg-tertiary-container"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Servicio en barra</span></div>
+      <span class="font-label-sm text-label-sm font-semibold text-secondary">En directo</span>
+    </div>
+    <a href="{{ url_for('menu.index') }}" class="flex items-center gap-3 rounded-xl px-3.5 py-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">storefront</span><span class="font-label-md text-label-md">Ver la tienda</span></a>
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="flex w-full items-center gap-3 rounded-xl px-3.5 py-2 text-left text-on-surface-variant transition-colors hover:bg-surface-container hover:text-error"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">logout</span><span class="font-label-md text-label-md">Cerrar Sesión</span></button>
+    </form>
+  </div>
+</aside>
+
+<div class="lg:pl-72">
+  <header class="no-print fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between bg-surface/90 px-4 shadow-[0_1px_8px_rgba(61,39,29,0.03)] backdrop-blur-xl sm:px-6 lg:left-72 lg:px-8">
+    <div class="flex max-w-xl flex-1 items-center gap-3">
+      <button type="button" data-sidebar-toggle class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container lg:hidden" aria-label="Abrir menú"><span class="material-symbols-outlined" aria-hidden="true">menu</span></button>
+      <form action="{{ url_for('admin_orders.index') }}" method="get" role="search" class="relative w-full">
+        <span class="material-symbols-outlined pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant" aria-hidden="true">search</span>
+        <input type="search" name="q" value="{{ request.args.get('q', '') if request.endpoint == 'admin_orders.index' else '' }}" maxlength="60" placeholder="Buscar pedido o cliente..." aria-label="Buscar pedidos"
+               class="w-full rounded-xl bg-surface-container-lowest py-2 pl-10 pr-4 font-body-sm text-body-sm text-on-surface shadow-[0_1px_4px_rgba(61,39,29,0.03)] placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-secondary/40">
+      </form>
+      <div class="hidden shrink-0 items-center gap-2 rounded-xl bg-surface-container-low px-3 py-1.5 xl:flex">
+        <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">location_on</span>
+        <span class="truncate font-label-sm text-label-sm text-on-surface">{{ cafe.location_name }} - {{ cafe.address.split(',')[0] }}</span>
+      </div>
+    </div>
+    <div class="ml-4 flex shrink-0 items-center gap-3 sm:gap-4">
+      <a href="{{ url_for('admin_orders.index', estado='pagado') }}" class="relative rounded-xl p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface" aria-label="Pedidos por atender">
+        <span class="material-symbols-outlined text-[22px]" aria-hidden="true">notifications</span>
+        {% if badges.orders %}<span class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-error"></span>{% endif %}
+      </a>
+      <div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary font-label-sm text-label-sm text-on-primary" title="{{ current_user.name }}">{{ current_user.initials }}</div>
+    </div>
+  </header>
+
+  <main class="min-h-[calc(100vh-4rem)] w-full bg-surface px-4 pb-10 pt-[88px] sm:px-6 lg:px-8">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}

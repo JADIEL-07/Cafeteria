@@ -1,0 +1,265 @@
+{% extends "layouts/admin.html" %}
+{% from "partials/ui.html" import csrf, empty_state %}
+{% set admin_active = 'inventario' %}
+{% block title %}Inventario · Panel {{ cafe.short_name }}{% endblock %}
+
+{% macro dialog_head(title, subtitle) %}
+  <div class="flex items-start justify-between gap-4">
+    <div><h2 class="font-headline-sm text-headline-sm text-primary">{{ title }}</h2><p class="font-body-sm text-body-sm text-on-surface-variant">{{ subtitle }}</p></div>
+    <button type="button" data-close-dialog class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container" aria-label="Cerrar"><span class="material-symbols-outlined text-[20px]">close</span></button>
+  </div>
+{% endmacro %}
+
+{% block content %}
+{% set next_url = request.full_path.rstrip('?') %}
+{% set status_tone = {'critico': 'bg-error-container text-error', 'alerta': 'bg-secondary-fixed text-on-secondary-fixed', 'optimo': 'bg-tertiary-fixed text-on-tertiary-fixed'} %}
+{% set status_dot = {'critico': 'bg-error', 'alerta': 'bg-secondary', 'optimo': 'bg-tertiary'} %}
+{% set stock_tone = {'critico': 'text-error', 'alerta': 'text-secondary', 'optimo': 'text-tertiary'} %}
+<div class="flex flex-col gap-8">
+
+  <div class="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+    <div class="flex flex-col gap-1.5">
+      <div class="flex items-center gap-2"><span class="font-label-sm text-label-sm uppercase tracking-widest text-secondary">Insumos &amp; Obrador</span><span class="h-1.5 w-1.5 rounded-full bg-secondary"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Cada compra se registra en la cartera</span></div>
+      <h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary lg:font-headline-lg lg:text-headline-lg">Control de Inventario e Insumos</h1>
+      <p class="max-w-2xl font-body-md text-body-md text-on-surface-variant">Stock en tiempo real. Se descuenta solo al aceptar cada pedido, según la receta de cada producto.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="button" data-open-dialog="dlg-adjust" class="btn-soft !bg-surface-container-high"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">tune</span>Ajuste de Stock</button>
+      <button type="button" data-open-dialog="dlg-purchase" class="btn-soft !bg-surface-container-high"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">shopping_cart_checkout</span>Registrar Compra</button>
+      <button type="button" data-open-dialog="dlg-new" class="btn-primary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">add_circle</span>Nuevo Insumo</button>
+    </div>
+  </div>
+
+  {# Alertas #}
+  {% if alerts %}
+  <div class="flex flex-col gap-4 lg:flex-row">
+    {% for item in alerts %}
+    {% set crit = item.status == 'critico' %}
+    <div class="relative flex flex-1 items-start gap-4 overflow-hidden rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+      <div class="absolute bottom-0 left-0 top-0 w-1.5 {{ 'bg-error' if crit else 'bg-secondary' }}"></div>
+      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ 'bg-error-container text-error' if crit else 'bg-secondary-fixed text-on-secondary-fixed' }}"><span class="material-symbols-outlined text-[22px]" aria-hidden="true">{{ 'emergency_home' if crit else 'inventory' }}</span></div>
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <div class="flex items-center justify-between gap-2"><span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider {{ 'text-error' if crit else 'text-secondary' }}">{{ 'Stock crítico' if crit else 'Stock bajo' }}</span><span class="rounded-full px-2 py-0.5 font-label-sm text-label-sm {{ status_tone[item.status] }}">Reabastecer</span></div>
+        <p class="font-headline-sm text-headline-sm text-primary">{{ item.name }}</p>
+        <p class="font-body-sm text-body-sm text-on-surface-variant">Quedan {{ item.stock|qty }} {{ item.unit }} (mínimo {{ item.min_stock|qty }}). Reposición sugerida: {{ item.suggested_qty()|qty }} {{ item.unit }}.</p>
+      </div>
+      {% set fill = {'item_id': item.id, 'qty': item.suggested_qty(), 'unit_cost': '%.2f'|format(item.unit_cost_cents / 100), 'supplier': item.supplier or ''} %}
+      <button type="button" data-open-dialog="dlg-purchase" data-fill='{{ fill|tojson }}' class="shrink-0 self-center rounded-lg p-2 text-primary hover:bg-surface-container" title="Registrar compra" aria-label="Registrar compra de {{ item.name }}"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">shopping_cart_checkout</span></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# KPIs #}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-5 shadow-sm">
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Valor en Almacén</span><div class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container text-secondary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">account_balance_wallet</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold tracking-tight text-primary">{{ kpis.total_value_cents|money }}</span><span class="mt-1 font-body-sm text-body-sm text-on-surface-variant">Stock actual al último costo de compra</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-5 shadow-sm">
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Insumos Registrados</span><div class="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container text-secondary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">inventory_2</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold text-primary">{{ kpis.count }}</span><span class="mt-1 font-body-sm text-body-sm text-on-surface-variant">en {{ categories|length }} categorías</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-5 shadow-sm">
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">En Nivel Óptimo</span><div class="flex h-8 w-8 items-center justify-center rounded-lg bg-tertiary-fixed text-tertiary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">check_circle</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold text-primary">{{ kpis.ok_count }}</span><span class="mt-1 font-body-sm text-body-sm text-tertiary">{{ ((kpis.ok_count * 100 / kpis.count)|round|int) if kpis.count else 0 }}% de cobertura operativa</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-5 shadow-sm">
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Requieren Reposición</span><div class="flex h-8 w-8 items-center justify-center rounded-lg {{ 'bg-error-container text-error' if kpis.low_count else 'bg-surface-container text-secondary' }}"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">warning</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold {{ 'text-error' if kpis.low_count else 'text-primary' }}">{{ kpis.low_count }}</span><span class="mt-1 font-body-sm text-body-sm {{ 'text-error' if kpis.critical_count else 'text-on-surface-variant' }}">{{ kpis.critical_count }} en estado crítico</span></div>
+    </div>
+  </div>
+
+  {# Tabla #}
+  <div class="flex flex-col gap-4">
+    <div class="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+      <div class="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
+        <a href="{{ url_for('admin_inventory.index', q=query or None) }}" class="shrink-0 rounded-full px-4 py-2 font-label-md text-label-md transition-colors {{ 'bg-primary text-on-primary shadow-sm' if not active_category else 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high' }}">Todos ({{ kpis.count }})</a>
+        {% for key, label in categories.items() %}
+          <a href="{{ url_for('admin_inventory.index', cat=key, q=query or None) }}" class="shrink-0 rounded-full px-4 py-2 font-label-md text-label-md transition-colors {{ 'bg-primary text-on-primary shadow-sm' if active_category == key else 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high' }}">{{ label }} ({{ counts.get(key, 0) }})</a>
+        {% endfor %}
+      </div>
+      <form method="get" action="{{ url_for('admin_inventory.index') }}" role="search" class="relative w-full md:w-72">
+        {% if active_category %}<input type="hidden" name="cat" value="{{ active_category }}">{% endif %}
+        <span class="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant" aria-hidden="true">search</span>
+        <input type="search" name="q" value="{{ query }}" maxlength="60" placeholder="Buscar insumo o SKU..." aria-label="Buscar insumos" class="w-full rounded-xl bg-surface-container-lowest py-2 pl-9 pr-3 font-body-sm text-body-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-secondary/40">
+      </form>
+    </div>
+
+    <div class="overflow-hidden rounded-xl bg-surface-container-lowest shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[860px] text-left">
+          <thead class="bg-surface-container-low font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
+            <tr><th class="px-4 py-3">SKU</th><th class="px-4 py-3">Insumo</th><th class="px-4 py-3">Categoría</th><th class="px-4 py-3 text-right">Stock</th><th class="px-4 py-3 text-right">Mínimo</th><th class="px-4 py-3 text-right">Costo unit.</th><th class="px-4 py-3">Proveedor</th><th class="px-4 py-3 text-center">Estado</th><th class="px-4 py-3 text-right">Acciones</th></tr>
+          </thead>
+          <tbody class="divide-y divide-surface-container font-body-md text-body-md text-on-surface">
+            {% for i in items %}
+            <tr class="transition-colors hover:bg-surface-container-low/50">
+              <td class="px-4 py-3 font-mono font-label-sm text-label-sm text-on-surface-variant">{{ i.sku }}</td>
+              <td class="px-4 py-3"><span class="font-semibold text-primary">{{ i.name }}</span></td>
+              <td class="px-4 py-3"><span class="rounded-full bg-surface-container px-2.5 py-1 font-label-sm text-label-sm text-on-surface-variant">{{ i.category_label }}</span></td>
+              <td class="px-4 py-3 text-right font-semibold {{ stock_tone[i.status] }}">{{ i.stock|qty }} {{ i.unit }}</td>
+              <td class="px-4 py-3 text-right text-on-surface-variant">{{ i.min_stock|qty }} {{ i.unit }}</td>
+              <td class="px-4 py-3 text-right font-medium">{{ i.unit_cost_cents|money }} / {{ i.unit }}</td>
+              <td class="px-4 py-3 font-body-sm text-body-sm text-on-surface-variant">{{ i.supplier or '—' }}</td>
+              <td class="px-4 py-3 text-center"><span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-label-sm text-label-sm {{ status_tone[i.status] }}"><span class="h-1.5 w-1.5 rounded-full {{ status_dot[i.status] }}"></span>{{ i.status_label }}</span></td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  {% set edit_fill = {'item_id': i.id, 'name': i.name, 'category': i.category, 'min_stock': i.min_stock, 'unit_cost': '%.2f'|format(i.unit_cost_cents / 100), 'supplier': i.supplier or ''} %}
+                  <button type="button" data-open-dialog="dlg-edit" data-fill='{{ edit_fill|tojson }}' class="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container hover:text-primary" title="Editar" aria-label="Editar {{ i.name }}"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">edit</span></button>
+                  {% set adj_fill = {'item_id': i.id, 'new_stock': i.stock} %}
+                  <button type="button" data-open-dialog="dlg-adjust" data-fill='{{ adj_fill|tojson }}' class="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container hover:text-primary" title="Ajustar stock" aria-label="Ajustar stock de {{ i.name }}"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">tune</span></button>
+                  {% set buy_fill = {'item_id': i.id, 'qty': i.suggested_qty() or '', 'unit_cost': '%.2f'|format(i.unit_cost_cents / 100), 'supplier': i.supplier or ''} %}
+                  <button type="button" data-open-dialog="dlg-purchase" data-fill='{{ buy_fill|tojson }}' class="rounded-lg p-1.5 text-secondary hover:bg-secondary-fixed hover:text-primary" title="Registrar compra" aria-label="Registrar compra de {{ i.name }}"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">shopping_cart_checkout</span></button>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="px-4 py-10 text-center font-body-md text-body-md text-on-surface-variant">No hay insumos que coincidan con la búsqueda.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="bg-surface-container-low p-4 font-body-sm text-body-sm text-on-surface-variant">Mostrando {{ items|length }} de {{ kpis.count }} insumos</div>
+    </div>
+  </div>
+
+  {# Movimientos + compras sugeridas #}
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="flex flex-col gap-4 rounded-xl bg-surface-container-lowest p-6 shadow-sm">
+      <div class="flex items-center justify-between"><span class="font-headline-sm text-headline-sm text-primary">Movimientos Recientes</span><span class="font-label-sm text-label-sm text-secondary">Últimos {{ movements|length }}</span></div>
+      <div class="flex flex-col gap-3">
+        {% for m in movements %}
+        {% set glyphs = {'compra': 'shopping_cart_checkout', 'consumo': 'coffee_maker', 'ajuste': 'tune', 'merma': 'delete_sweep'} %}
+        <div class="flex items-center justify-between gap-3 rounded-xl bg-surface-container-low p-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <span class="material-symbols-outlined text-[22px] {{ 'text-tertiary' if m.qty > 0 else 'text-secondary' }}" aria-hidden="true">{{ glyphs.get(m.kind, 'swap_vert') }}</span>
+            <div class="min-w-0 flex flex-col">
+              <span class="truncate font-label-md text-label-md font-semibold text-primary">{{ m.item.name }}</span>
+              <span class="truncate font-body-sm text-body-sm text-on-surface-variant">{{ m.kind_label }}{% if m.reference %} · {{ m.reference }}{% endif %} · {{ m.created_at|friendly }}</span>
+            </div>
+          </div>
+          <div class="shrink-0 text-right"><span class="block font-label-md text-label-md font-bold {{ 'text-tertiary' if m.qty > 0 else 'text-secondary' }}">{{ '+' if m.qty > 0 }}{{ m.qty|qty }} {{ m.item.unit }}</span><span class="block text-[11px] text-on-surface-variant">quedan {{ m.stock_after|qty }}</span></div>
+        </div>
+        {% else %}
+          <p class="py-6 text-center font-body-md text-body-md text-on-surface-variant">Aún no hay movimientos.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-6 shadow-sm">
+      <div class="flex flex-col gap-1"><span class="font-headline-sm text-headline-sm text-primary">Compras Sugeridas</span><span class="font-body-sm text-body-sm text-on-surface-variant">Insumos bajo su mínimo, repuestos hasta 2x el mínimo al último costo.</span></div>
+      <div class="my-4 flex flex-col gap-3">
+        {% for s in suggestions %}
+        <div class="flex items-center justify-between gap-3 rounded-xl bg-surface-container-low p-3.5">
+          <div class="flex min-w-0 flex-col"><span class="truncate font-label-md text-label-md font-semibold text-primary">{{ s.item.name }}</span><span class="font-body-sm text-body-sm text-on-surface-variant">{{ s.qty|qty }} {{ s.item.unit }}{% if s.item.supplier %} · {{ s.item.supplier }}{% endif %}</span></div>
+          <div class="flex shrink-0 items-center gap-3"><span class="font-label-lg text-label-lg text-primary">{{ s.cost_cents|money }}</span>
+            <form method="post" action="{{ url_for('admin_inventory.restock') }}" data-confirm="¿Registrar la compra de {{ s.qty|qty }} {{ s.item.unit }} de {{ s.item.name }} por {{ s.cost_cents|money }}?">{{ csrf() }}<input type="hidden" name="item_id" value="{{ s.item.id }}"><input type="hidden" name="next" value="{{ next_url }}">
+              <button type="submit" class="btn-soft !px-3 !py-1.5">Comprar</button></form></div>
+        </div>
+        {% else %}
+          <div class="flex flex-col items-center gap-2 py-8 text-center"><span class="material-symbols-outlined text-[32px] text-tertiary" aria-hidden="true">check_circle</span><p class="font-body-md text-body-md text-on-surface-variant">Todo el inventario está sobre su nivel mínimo.</p></div>
+        {% endfor %}
+      </div>
+      {% if suggestions %}
+      <form method="post" action="{{ url_for('admin_inventory.restock') }}" data-confirm="¿Registrar {{ suggestions|length }} compras por {{ suggestions|sum(attribute='cost_cents')|money }}? Se descontarán de la cartera.">{{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+        {% for s in suggestions %}<input type="hidden" name="item_id" value="{{ s.item.id }}">{% endfor %}
+        <button type="submit" class="btn-primary w-full !py-3"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">send</span>Registrar {{ suggestions|length }} compra{{ 's' if suggestions|length != 1 }} ({{ suggestions|sum(attribute='cost_cents')|money }})</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ---------- Diálogos ---------- #}
+<dialog id="dlg-purchase" class="m-auto w-[min(92vw,30rem)] rounded-2xl bg-surface-container-lowest shadow-2xl">
+  <form method="post" action="{{ url_for('admin_inventory.purchase') }}" class="flex flex-col gap-4 p-6">
+    {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+    {{ dialog_head('Registrar compra', 'Sube el stock y descuenta el gasto de la cartera como inversión en inventario.') }}
+    <div><label class="field-label" for="p-item">Insumo</label>
+      <select id="p-item" name="item_id" required class="field" data-cost-source>
+        {% for i in all_items %}<option value="{{ i.id }}" data-unit="{{ i.unit }}" data-cost="{{ '%.2f'|format(i.unit_cost_cents / 100) }}" data-supplier="{{ i.supplier or '' }}">{{ i.name }} ({{ i.unit }})</option>{% endfor %}
+      </select></div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="field-label" for="p-qty">Cantidad (<span data-unit-label>uds</span>)</label><input id="p-qty" name="qty" required inputmode="decimal" placeholder="0" class="field"></div>
+      <div><label class="field-label" for="p-cost">Costo por unidad ($)</label><input id="p-cost" name="unit_cost" required inputmode="decimal" placeholder="0.00" class="field"></div>
+    </div>
+    <div><label class="field-label" for="p-supplier">Proveedor</label><input id="p-supplier" name="supplier" maxlength="120" class="field" placeholder="Opcional"></div>
+    <div class="flex justify-end gap-2 pt-2"><button type="button" data-close-dialog class="btn-soft">Cancelar</button><button type="submit" class="btn-primary">Registrar compra</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-adjust" class="m-auto w-[min(92vw,30rem)] rounded-2xl bg-surface-container-lowest shadow-2xl">
+  <form method="post" action="{{ url_for('admin_inventory.adjust') }}" class="flex flex-col gap-4 p-6">
+    {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+    {{ dialog_head('Ajuste de stock', 'Corrige el stock tras un conteo físico o descarta producto dañado (merma). No afecta la cartera.') }}
+    <div><label class="field-label" for="a-item">Insumo</label>
+      <select id="a-item" name="item_id" required class="field">{% for i in all_items %}<option value="{{ i.id }}">{{ i.name }} — hay {{ i.stock|qty }} {{ i.unit }}</option>{% endfor %}</select></div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="field-label" for="a-kind">Tipo</label><select id="a-kind" name="kind" class="field"><option value="ajuste">Conteo físico</option><option value="merma">Merma / desperdicio</option></select></div>
+      <div><label class="field-label" for="a-stock">Stock real ahora</label><input id="a-stock" name="new_stock" required inputmode="decimal" placeholder="0" class="field"></div>
+    </div>
+    <div><label class="field-label" for="a-note">Motivo</label><input id="a-note" name="note" maxlength="160" class="field" placeholder="Ej. Conteo del cierre, caducado, derrame..."></div>
+    <div class="flex justify-end gap-2 pt-2"><button type="button" data-close-dialog class="btn-soft">Cancelar</button><button type="submit" class="btn-primary">Guardar ajuste</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-new" class="m-auto w-[min(92vw,34rem)] rounded-2xl bg-surface-container-lowest shadow-2xl">
+  <form method="post" action="{{ url_for('admin_inventory.create') }}" class="flex flex-col gap-4 p-6">
+    {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+    {{ dialog_head('Nuevo insumo', 'Si indicas stock inicial, se registra como compra en la cartera.') }}
+    <div><label class="field-label" for="n-name">Nombre</label><input id="n-name" name="name" required minlength="2" maxlength="120" class="field" placeholder="Ej. Leche de coco"></div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="field-label" for="n-cat">Categoría</label><select id="n-cat" name="category" class="field">{% for key, label in categories.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+      <div><label class="field-label" for="n-unit">Unidad</label><select id="n-unit" name="unit" class="field">{% for u in units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="grid grid-cols-3 gap-3">
+      <div><label class="field-label" for="n-min">Mínimo</label><input id="n-min" name="min_stock" inputmode="decimal" placeholder="0" class="field"></div>
+      <div><label class="field-label" for="n-cost">Costo unit. ($)</label><input id="n-cost" name="unit_cost" inputmode="decimal" placeholder="0.00" class="field"></div>
+      <div><label class="field-label" for="n-init">Stock inicial</label><input id="n-init" name="initial_stock" inputmode="decimal" placeholder="0" class="field"></div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="field-label" for="n-supplier">Proveedor</label><input id="n-supplier" name="supplier" maxlength="120" class="field" placeholder="Opcional"></div>
+      <div><label class="field-label" for="n-sku">SKU</label><input id="n-sku" name="sku" maxlength="30" class="field" placeholder="Automático"></div>
+    </div>
+    <div class="flex justify-end gap-2 pt-2"><button type="button" data-close-dialog class="btn-soft">Cancelar</button><button type="submit" class="btn-primary">Crear insumo</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-edit" class="m-auto w-[min(92vw,30rem)] rounded-2xl bg-surface-container-lowest shadow-2xl">
+  <form method="post" action="{{ url_for('admin_inventory.edit') }}" class="flex flex-col gap-4 p-6">
+    {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}"><input type="hidden" name="item_id">
+    {{ dialog_head('Editar insumo', 'El stock se cambia con “Ajuste de stock”; la unidad no se puede modificar.') }}
+    <div><label class="field-label" for="e-name">Nombre</label><input id="e-name" name="name" required minlength="2" maxlength="120" class="field"></div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="field-label" for="e-cat">Categoría</label><select id="e-cat" name="category" class="field">{% for key, label in categories.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+      <div><label class="field-label" for="e-min">Stock mínimo</label><input id="e-min" name="min_stock" inputmode="decimal" class="field"></div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="field-label" for="e-cost">Costo unit. ($)</label><input id="e-cost" name="unit_cost" inputmode="decimal" class="field"></div>
+      <div><label class="field-label" for="e-supplier">Proveedor</label><input id="e-supplier" name="supplier" maxlength="120" class="field"></div>
+    </div>
+    <div class="flex justify-end gap-2 pt-2"><button type="button" data-close-dialog class="btn-soft">Cancelar</button><button type="submit" class="btn-primary">Guardar cambios</button></div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // En "Registrar compra": al elegir insumo se propone su último costo y proveedor.
+  (function () {
+    var select = document.querySelector('#dlg-purchase [data-cost-source]');
+    if (!select) return;
+    select.addEventListener('change', function () {
+      var opt = select.options[select.selectedIndex];
+      if (!opt) return;
+      var dialog = select.closest('dialog');
+      var label = dialog.querySelector('[data-unit-label]');
+      if (label) label.textContent = opt.dataset.unit;
+      dialog.querySelector('[name="unit_cost"]').value = opt.dataset.cost;
+      dialog.querySelector('[name="supplier"]').value = opt.dataset.supplier;
+    });
+    select.dispatchEvent(new Event('change'));
+  })();
+</script>
+{% endblock %}

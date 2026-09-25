@@ -1,0 +1,17 @@
+{% extends "layouts/customer.html" %}
+{% set nav_active = '' %}
+{% set page_label = 'Ups' %}
+{% block title %}{{ title }} · {{ cafe.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto flex w-full max-w-[640px] flex-col items-center gap-space-md px-margin py-space-xl text-center lg:py-[72px]">
+  <div class="flex h-20 w-20 items-center justify-center rounded-full bg-surface-container text-secondary"><span class="material-symbols-outlined text-[40px]" aria-hidden="true">{{ 'lock' if code in (401, 403) else 'coffee' }}</span></div>
+  <span class="font-label-md text-label-md font-semibold uppercase tracking-widest text-secondary">Error {{ code }}</span>
+  <h1 class="font-headline-xl-mobile text-headline-xl-mobile text-primary lg:font-headline-xl lg:text-headline-xl">{{ title }}</h1>
+  <p class="max-w-md font-body-lg text-body-lg text-on-surface-variant">{{ message }}</p>
+  <div class="mt-space-sm flex flex-wrap justify-center gap-space-sm">
+    <a href="{{ url_for('menu.index') }}" class="btn-primary">Volver al menú</a>
+    {% if code == 401 or (code == 403 and not current_user) %}<a href="{{ url_for('auth.login') }}" class="btn-soft">Iniciar sesión</a>{% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "layouts/customer.html" %}
+{% from "partials/ui.html" import product_card, empty_state %}
+{% set nav_active = 'favoritos' %}
+{% set page_label = 'Favoritos' %}
+{% block title %}Mis favoritos · {{ cafe.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto w-full max-w-[1140px] px-margin py-space-lg lg:px-gutter lg:py-space-xl">
+  <div class="mb-space-lg">
+    <span class="font-label-sm text-label-sm font-semibold uppercase tracking-widest text-secondary">Tus preferidos</span>
+    <h1 class="font-headline-xl-mobile text-headline-xl-mobile font-semibold tracking-tight text-primary lg:font-headline-xl lg:text-headline-xl">Favoritos</h1>
+    <p class="mt-1 font-body-md text-body-md text-on-surface-variant">Las bebidas y panes que más te gustan, siempre a un toque de distancia.</p>
+  </div>
+  {% if products %}
+    <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-space-lg">
+      {% for p in products %}{{ product_card(p, favorite_ids) }}{% endfor %}
+    </div>
+  {% else %}
+    {{ empty_state('favorite', 'Aún no tienes favoritos', 'Toca el corazón en cualquier producto del menú para guardarlo aquí.', url_for('menu.index'), 'Explorar el menú') }}
+  {% endif %}
+</div>
+{% endblock %}

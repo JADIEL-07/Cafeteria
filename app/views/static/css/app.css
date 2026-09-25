@@ -1,0 +1,25 @@
+/* Estilos globales mínimos: el resto de la apariencia vive en las clases Tailwind del diseño. */
+html { scroll-behavior: smooth; }
+body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Zonas seguras en móviles con notch */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Evita el parpadeo del texto de iconos mientras carga la fuente */
+.material-symbols-outlined { font-display: block; user-select: none; }
+
+/* Impresión de recibos / comandas: sólo el contenido marcado */
+@media print {
+  header, footer, nav, aside, .no-print, #flash-stack { display: none !important; }
+  main { padding-top: 0 !important; padding-bottom: 0 !important; }
+  body { background: #fff !important; }
+  .print-only { display: block !important; }
+}
+.print-only { display: none; }
+
+/* Diálogos nativos <dialog> */
+dialog { border: 0; padding: 0; background: transparent; max-width: 100vw; max-height: 100vh; }
+dialog::backdrop { background: rgba(38, 19, 10, 0.45); backdrop-filter: blur(2px); }

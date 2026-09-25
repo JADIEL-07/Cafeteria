@@ -1,0 +1,198 @@
+{% extends "layouts/customer.html" %}
+{% from "partials/ui.html" import product_card, empty_state, icon, image_src %}
+{% set nav_active = 'menu' %}
+{% set page_label = 'Menú' %}
+{% block title %}Menú · {{ cafe.name }}{% endblock %}
+
+{% block content %}
+{# Saludo y modo de entrega (sólo móvil) #}
+<section class="flex flex-col gap-space-sm px-margin pt-4 lg:hidden">
+  <div class="flex items-center justify-between">
+    <div class="flex flex-col">
+      {% set hello, hello_icon = greeting() %}
+      <span class="flex items-center gap-1 font-label-md text-label-md tracking-wide text-secondary">
+        <span class="material-symbols-outlined text-[16px]" aria-hidden="true">{{ hello_icon }}</span>{{ hello }}{% if current_user %}, {{ current_user.first_name }}{% endif %}!
+      </span>
+      <h1 class="font-headline-xl-mobile text-headline-xl-mobile tracking-tight text-primary">El aroma de hoy</h1>
+    </div>
+  </div>
+  {% set next_url = request.full_path.rstrip('?') %}
+  {% include "partials/mode_selector.html" %}
+</section>
+
+{# Barra informativa #}
+<section class="hidden w-full bg-surface-container-low/70 px-gutter py-space-sm lg:block">
+  <div class="mx-auto flex max-w-[1140px] flex-wrap items-center justify-between gap-space-sm">
+    <div class="flex items-center gap-space-sm">
+      <span class="inline-flex h-2 w-2 items-center justify-center rounded-full bg-secondary"></span>
+      <span class="font-label-sm text-label-sm font-bold uppercase tracking-wider text-secondary">Preparado al momento</span>
+      <span class="font-body-sm text-body-sm text-on-surface-variant">Café molido y repostería horneada cada mañana</span>
+    </div>
+    <div class="flex items-center gap-space-md text-on-surface-variant">
+      <div class="flex items-center gap-space-xs font-body-sm text-body-sm">
+        <span class="material-symbols-outlined text-[16px] text-secondary" aria-hidden="true">schedule</span>
+        <span>Tiempo estimado en barra: <strong class="font-semibold text-on-surface">{{ wait[0] }}-{{ wait[1] }} min</strong></span>
+      </div>
+      <span class="text-outline-variant">•</span>
+      <div class="flex items-center gap-space-xs font-body-sm text-body-sm">
+        <span class="material-symbols-outlined text-[16px] text-secondary" aria-hidden="true">eco</span><span>Envases 100% compostables</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# Portada: bebida insignia #}
+{% if featured %}
+<section class="w-full bg-surface px-margin py-space-lg lg:px-gutter lg:py-space-xl">
+  <div class="mx-auto max-w-[1140px]">
+    <div class="mb-space-lg hidden max-w-2xl lg:block">
+      <div class="mb-space-xs flex items-center gap-space-xs">
+        <span class="material-symbols-outlined fill-1 text-[20px] text-secondary" aria-hidden="true">local_cafe</span>
+        <span class="font-label-md text-label-md font-semibold uppercase tracking-widest text-secondary">Carta de Especialidad &amp; Obrador</span>
+      </div>
+      <h1 class="font-headline-xl text-headline-xl font-medium leading-tight tracking-tight text-primary">Carta de Temporada &amp; Cosechas de Origen</h1>
+      <p class="mt-space-sm font-body-lg text-body-lg leading-relaxed text-on-surface-variant">Granos 100% arábica y repostería de masa madre horneada al alba. Elaborados a fuego lento, servidos con devoción.</p>
+    </div>
+    <div class="relative w-full overflow-hidden rounded-2xl bg-primary-container text-on-primary shadow-xl">
+      {% if featured.image_url %}
+        <img src="{{ image_src(featured) }}" alt="" referrerpolicy="no-referrer" class="absolute right-0 top-0 h-full w-full object-cover opacity-40 mix-blend-luminosity lg:w-3/5 lg:opacity-65" onerror="this.remove()">
+      {% endif %}
+      <div class="absolute inset-0 z-10 bg-gradient-to-r from-primary via-primary-container/90 to-transparent"></div>
+      <div class="relative z-20 flex min-h-[260px] max-w-2xl flex-col justify-between p-space-lg lg:min-h-[300px] lg:p-space-xl">
+        <div>
+          <div class="mb-space-sm flex flex-wrap items-center gap-space-xs">
+            <span class="rounded-full bg-secondary px-space-sm py-0.5 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-on-secondary">Bebida insignia</span>
+            {% if featured.origin %}<span class="rounded-full bg-tertiary-container px-space-sm py-0.5 font-label-sm text-label-sm font-medium text-tertiary-fixed">{{ featured.origin }}</span>{% endif %}
+          </div>
+          <h2 class="mb-space-xs font-headline-lg-mobile text-headline-lg-mobile font-semibold leading-tight text-on-primary lg:font-headline-lg lg:text-headline-lg">{{ featured.name }}</h2>
+          <p class="mb-space-md font-body-md text-body-md leading-relaxed text-surface-container-high">{{ featured.description }}</p>
+          <div class="flex flex-wrap items-center gap-space-md pb-space-sm font-body-sm text-body-sm text-surface-container-high">
+            {% if featured.calories %}<div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px] text-secondary-fixed" aria-hidden="true">bolt</span><span>{{ featured.calories }} kcal</span></div>{% endif %}
+            <div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px] text-secondary-fixed" aria-hidden="true">timer</span><span>{{ featured.prep_minutes }} min de elaboración</span></div>
+            {% if featured.caffeine_mg %}<div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[18px] text-secondary-fixed" aria-hidden="true">coffee</span><span>{{ featured.caffeine_mg }} mg de cafeína</span></div>{% endif %}
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-space-md pt-space-md">
+          <a href="{{ url_for('menu.product', slug=featured.slug) }}" class="group inline-flex items-center gap-space-xs rounded-xl bg-secondary px-space-lg py-space-sm font-label-lg text-label-lg text-on-secondary shadow-md transition-all hover:bg-on-secondary-container">
+            <span>Personalizar y pedir</span><span class="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1" aria-hidden="true">arrow_forward</span>
+          </a>
+          <div class="flex items-baseline gap-space-xs text-on-primary">
+            <span class="font-body-sm text-body-sm text-on-primary-container">Desde</span>
+            <span class="font-headline-md text-headline-md font-semibold text-secondary-fixed">{{ featured.price_cents|money }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# Filtros #}
+<section class="z-40 w-full bg-surface/95 px-margin py-space-sm shadow-sm backdrop-blur-md lg:sticky lg:top-20 lg:px-gutter lg:py-space-md">
+  <div class="mx-auto flex max-w-[1140px] flex-col gap-space-sm">
+    <div class="no-scrollbar flex items-center gap-space-xs overflow-x-auto pb-1" aria-label="Categorías">
+      <a href="{{ url_for('menu.index', q=query or None, dieta=diets, orden=sort if sort != 'popular' else None) }}"
+         class="flex shrink-0 items-center gap-space-xs whitespace-nowrap rounded-full px-space-md py-space-xs font-label-md text-label-md transition-all {{ 'bg-primary-container text-on-primary shadow-sm' if not active_category else 'bg-surface-container text-on-surface-variant hover:text-on-surface' }}">
+        {{ icon('restaurant_menu', 'text-[18px]') }}<span>Todos</span><span class="rounded-full px-1.5 py-0.5 font-label-sm text-label-sm font-semibold {{ 'bg-primary text-on-primary' if not active_category else '' }}">{{ total_products }}</span>
+      </a>
+      {% for c in categories %}
+        {% set on = active_category == c.slug %}
+        <a href="{{ url_for('menu.index', cat=c.slug, q=query or None, dieta=diets, orden=sort if sort != 'popular' else None) }}"
+           class="flex shrink-0 items-center gap-space-xs whitespace-nowrap rounded-full px-space-md py-space-xs font-label-md text-label-md transition-all {{ 'bg-primary-container text-on-primary shadow-sm' if on else 'bg-surface-container text-on-surface-variant hover:text-on-surface' }}">
+          {{ icon(c.icon, 'text-[18px]') }}<span>{{ c.name }}</span><span class="font-label-sm text-label-sm {{ 'font-semibold' if on }}">{{ counts.get(c.slug, 0) }}</span>
+        </a>
+      {% endfor %}
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-space-sm">
+      <div class="no-scrollbar flex items-center gap-space-xs overflow-x-auto">
+        <span class="mr-space-xs shrink-0 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-outline">Preferencia:</span>
+        {% for tag, label in diet_tags.items() %}
+          {% set next_diets = (diets | reject('equalto', tag) | list) if tag in diets else (diets + [tag]) %}
+          <a href="{{ url_for('menu.index', cat=active_category, q=query or None, dieta=next_diets, orden=sort if sort != 'popular' else None) }}" aria-pressed="{{ 'true' if tag in diets else 'false' }}"
+             class="shrink-0 whitespace-nowrap rounded-full px-space-sm py-1 font-label-sm text-label-sm transition-colors {{ 'bg-secondary text-on-secondary' if tag in diets else 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest' }}">{{ label }}</a>
+        {% endfor %}
+        {% if filtered %}<a href="{{ url_for('menu.index') }}" class="ml-space-xs flex shrink-0 items-center gap-0.5 font-label-sm text-label-sm text-secondary hover:underline"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">close</span>Limpiar filtros</a>{% endif %}
+      </div>
+      <form method="get" action="{{ url_for('menu.index') }}" class="ml-auto flex items-center gap-space-sm">
+        {% if active_category %}<input type="hidden" name="cat" value="{{ active_category }}">{% endif %}
+        {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+        {% for tag in diets %}<input type="hidden" name="dieta" value="{{ tag }}">{% endfor %}
+        <div class="relative flex items-center">
+          <span class="material-symbols-outlined pointer-events-none absolute left-2.5 text-[16px] text-outline" aria-hidden="true">sort</span>
+          <select name="orden" data-autosubmit aria-label="Ordenar productos" class="cursor-pointer appearance-none rounded-full bg-surface-container-lowest py-1.5 pl-8 pr-7 font-label-sm text-label-sm text-on-surface shadow-sm outline-none transition-colors hover:bg-surface-container">
+            {% for key, label in sort_options.items() %}<option value="{{ key }}" {{ 'selected' if key == sort }}>{{ label }}</option>{% endfor %}
+          </select>
+          <span class="material-symbols-outlined pointer-events-none absolute right-2 text-[16px] text-outline" aria-hidden="true">expand_more</span>
+        </div>
+        <noscript><button class="btn-soft !py-1">Ordenar</button></noscript>
+        <div class="hidden rounded-full bg-surface-container px-space-sm py-1 font-body-sm text-body-sm text-on-surface-variant sm:block"><span class="font-semibold text-on-surface">{{ products|length }}</span> productos</div>
+      </form>
+    </div>
+  </div>
+</section>
+
+{# Productos #}
+<section class="w-full bg-surface px-margin py-space-lg lg:px-gutter lg:py-space-xl">
+  <div class="mx-auto max-w-[1140px]">
+    {% if query %}<p class="mb-space-md font-body-md text-body-md text-on-surface-variant">Resultados para «<strong class="text-primary">{{ query }}</strong>»</p>{% endif %}
+    {% if products %}
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-space-lg">
+        {% for p in products %}{{ product_card(p, favorite_ids) }}{% endfor %}
+      </div>
+    {% else %}
+      {{ empty_state('search_off', 'No encontramos productos', 'Prueba con otra categoría o quita algún filtro para ver toda la carta.', url_for('menu.index'), 'Ver toda la carta') }}
+    {% endif %}
+  </div>
+</section>
+
+{# Compromiso Moka #}
+<section class="hidden w-full bg-surface px-gutter py-space-xl lg:block">
+  <div class="mx-auto max-w-[1140px]">
+    <div class="mx-auto mb-space-xl max-w-xl text-center">
+      <span class="font-label-sm text-label-sm font-bold uppercase tracking-widest text-secondary">Nuestro Compromiso</span>
+      <h2 class="mt-space-xs font-headline-lg text-headline-lg font-medium text-primary">Calidad Consciente en Cada Detalle</h2>
+    </div>
+    <div class="grid grid-cols-1 gap-space-lg md:grid-cols-3">
+      {% for glyph, title, text in [('thermostat', 'Café en Lotes Pequeños', 'Molemos y extraemos al momento, con control de temperatura y proporción, para conservar los aceites aromáticos de cada grano.'), ('water_full', 'Leches Vegetales Artesanales', 'Avena y almendra sin azúcares refinados ni espesantes artificiales, pensadas para un maridaje limpio con el café.'), ('oven_gen', 'Horneado Continuo al Día', 'Nuestro obrador hornea varias veces al día para que cada croissant y cada tosta lleguen crujientes y frescos a tu mesa.')] %}
+        <div class="rounded-2xl bg-surface-container-low p-space-lg shadow-sm transition-shadow hover:shadow-md">
+          <div class="mb-space-md flex h-12 w-12 items-center justify-center rounded-xl bg-surface-container-lowest text-secondary shadow-sm"><span class="material-symbols-outlined text-[24px]" aria-hidden="true">{{ glyph }}</span></div>
+          <h3 class="mb-space-xs font-headline-sm text-headline-sm font-medium text-primary">{{ title }}</h3>
+          <p class="font-body-md text-body-md leading-relaxed text-on-surface-variant">{{ text }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{# Moka Club #}
+<section class="w-full px-margin py-space-lg lg:bg-surface-container-high lg:px-gutter lg:py-space-xl">
+  <div class="relative mx-auto max-w-[1140px] overflow-hidden rounded-3xl bg-primary-container p-space-lg text-on-primary shadow-lg lg:p-space-xl">
+    <div class="pointer-events-none absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-secondary/20 blur-3xl"></div>
+    <div class="relative z-10 flex flex-col items-center justify-between gap-space-lg lg:flex-row">
+      <div class="flex items-center gap-space-md">
+        <div class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-secondary text-on-secondary shadow-md"><span class="material-symbols-outlined fill-1 text-[32px]" aria-hidden="true">stars</span></div>
+        <div>
+          <div class="mb-1 flex items-center gap-space-xs">
+            <span class="rounded bg-secondary-container px-space-xs py-0.5 font-label-sm text-label-sm font-bold uppercase tracking-wider text-on-secondary-container">Moka Club</span>
+            <span class="font-body-sm text-body-sm text-surface-container-high">• Sin costo de membresía</span>
+          </div>
+          <h3 class="font-headline-lg-mobile text-headline-lg-mobile font-medium text-on-primary lg:font-headline-lg lg:text-headline-lg">Acumulas 1 Grano por cada $1 que gastas</h3>
+          {% if current_user and not current_user.is_staff %}
+            <p class="mt-1 max-w-xl font-body-md text-body-md text-surface-container-high">Tienes <strong class="text-secondary-fixed">{{ current_user.beans }} granos</strong> ({{ current_user.tier }}). Te faltan {{ current_user.beans_to_reward }} para tu próxima recompensa.</p>
+          {% else %}
+            <p class="mt-1 max-w-xl font-body-md text-body-md text-surface-container-high">Crea tu cuenta, haz tus pedidos desde el móvil y sigue su preparación en vivo mientras sumas granos.</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="flex flex-shrink-0 flex-wrap items-center gap-space-sm">
+        {% if current_user %}
+          <a href="{{ url_for('orders.profile') }}" class="rounded-xl bg-secondary px-space-lg py-space-sm font-label-md text-label-md font-semibold text-on-secondary shadow-sm transition-all hover:bg-on-secondary-container">Ver mi cuenta</a>
+        {% else %}
+          <a href="{{ url_for('auth.login', tab='register') }}" class="rounded-xl bg-secondary px-space-lg py-space-sm font-label-md text-label-md font-semibold text-on-secondary shadow-sm transition-all hover:bg-on-secondary-container">Crear Cuenta Gratuita</a>
+          <a href="{{ url_for('auth.login') }}" class="rounded-xl bg-surface-container-lowest/15 px-space-md py-space-sm font-label-md text-label-md text-on-primary transition-all hover:bg-surface-container-lowest/25">Ya tengo cuenta</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

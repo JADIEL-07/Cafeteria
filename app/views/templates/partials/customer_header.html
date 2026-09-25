@@ -1,0 +1,79 @@
+{% set cart_count, cart_total = cart_info() %}
+{% set page_label = page_label|default('Menú') %}
+
+{# ---------- Escritorio ---------- #}
+<header class="fixed left-0 right-0 top-0 z-50 hidden bg-surface/90 shadow-[0_1px_8px_rgba(61,39,29,0.05)] backdrop-blur-xl lg:block">
+  <div class="mx-auto flex h-20 w-full max-w-[1140px] items-center justify-between gap-space-md px-gutter">
+    <a href="{{ url_for('menu.index') }}" class="flex flex-shrink-0 items-center gap-space-sm">
+      <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="Logo {{ cafe.short_name }}" class="h-9 w-9 rounded-lg">
+      <span class="flex flex-col justify-center">
+        <span class="font-headline-md text-headline-md leading-none tracking-tight text-primary-container">{{ cafe.short_name }}</span>
+        <span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-secondary">Café &amp; Bakery</span>
+      </span>
+    </a>
+
+    <div class="hidden max-w-xs flex-shrink-0 items-center gap-space-xs rounded-full bg-surface-container px-space-sm py-space-xs xl:flex">
+      <span class="material-symbols-outlined pl-space-xs text-[18px] text-secondary" aria-hidden="true">storefront</span>
+      <span class="flex flex-col text-left">
+        <span class="font-label-sm text-label-sm text-on-surface-variant">Retiro en</span>
+        <span class="truncate font-label-md text-label-md font-semibold text-primary">{{ cafe.location_name }} · {{ cafe.address.split(',')[0] }}</span>
+      </span>
+    </div>
+
+    <form action="{{ url_for('menu.index') }}" method="get" role="search" class="hidden max-w-xs flex-1 md:block">
+      <label class="relative flex items-center">
+        <span class="material-symbols-outlined absolute left-space-sm text-[18px] text-on-surface-variant" aria-hidden="true">search</span>
+        <input type="search" name="q" value="{{ request.args.get('q', '') if request.endpoint == 'menu.index' else '' }}" maxlength="60" placeholder="Buscar bebidas, panadería..." aria-label="Buscar en el menú"
+               class="w-full rounded-full bg-surface-container-lowest py-space-xs pl-space-xl pr-space-md font-body-sm text-body-sm text-on-surface shadow-[0_2px_8px_rgba(61,39,29,0.04)] outline-none transition-all placeholder:text-on-surface-variant focus:shadow-[0_0_0_2px_rgba(134,82,37,0.2)]">
+      </label>
+    </form>
+
+    <nav class="flex items-center gap-space-xs" aria-label="Principal">
+      {% for key, label, endpoint in [('menu', 'Menú', 'menu.index'), ('favoritos', 'Favoritos', 'menu.favorites'), ('perfil', 'Mi Perfil', 'orders.profile')] %}
+        <a href="{{ url_for(endpoint) }}" {% if nav_active == key %}aria-current="page"{% endif %}
+           class="rounded-full px-space-sm py-space-xs font-label-md text-label-md transition-colors {{ 'bg-primary-container px-space-md font-semibold text-on-primary' if nav_active == key else 'text-on-surface-variant hover:text-on-surface' }}">{{ label }}</a>
+      {% endfor %}
+      {% if current_user and current_user.is_staff %}
+        <a href="{{ url_for('admin_orders.index') }}" class="rounded-full px-space-sm py-space-xs font-label-md text-label-md text-secondary transition-colors hover:text-primary">Panel</a>
+      {% endif %}
+    </nav>
+
+    <div class="flex flex-shrink-0 items-center gap-space-sm">
+      <a href="{{ url_for('cart.view') }}" aria-label="Ver carrito"
+         class="flex items-center gap-space-sm rounded-xl bg-primary-container px-space-md py-space-xs text-on-primary shadow-[0_4px_16px_-2px_rgba(61,39,29,0.08)] transition-all hover:bg-primary">
+        <span class="relative flex items-center justify-center">
+          <span class="material-symbols-outlined text-[20px]" aria-hidden="true">local_mall</span>
+          <span data-cart-count class="absolute -right-2 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-secondary-container px-1 font-label-sm text-[10px] font-bold text-on-secondary-container {{ 'hidden' if not cart_count }}">{{ cart_count }}</span>
+        </span>
+        {% if cart_count %}<span class="font-label-md text-label-md font-semibold">{{ cart_total|money }}</span>{% endif %}
+      </a>
+      {% if current_user %}
+        <a href="{{ url_for('orders.profile') }}" title="{{ current_user.name }}" class="flex h-8 w-8 items-center justify-center rounded-full bg-primary font-label-sm text-label-sm text-on-primary">{{ current_user.initials }}</a>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="btn-soft !px-3 !py-1.5"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">person</span>Iniciar sesión</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+{# ---------- Móvil ---------- #}
+<header class="pt-safe fixed left-0 right-0 top-0 z-50 bg-surface/85 shadow-[0_1px_8px_rgba(61,39,29,0.04)] backdrop-blur-xl lg:hidden">
+  <div class="flex h-16 items-center justify-between gap-space-sm px-margin">
+    <a href="{{ url_for('menu.index') }}" class="flex min-w-0 items-center gap-space-sm">
+      <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="Logo {{ cafe.short_name }}" class="h-8 w-8 shrink-0 rounded-lg">
+      <span class="flex flex-col truncate">
+        <span class="truncate font-headline-sm text-headline-sm leading-tight text-primary">{{ cafe.name }}</span>
+        <span class="truncate font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">{{ page_label }}</span>
+      </span>
+    </a>
+    <div class="flex shrink-0 items-center gap-space-xs">
+      <a href="{{ url_for('cart.view') }}" aria-label="Ver carrito" class="relative flex h-11 w-11 items-center justify-center rounded-full text-on-surface transition-colors hover:text-secondary">
+        <span class="material-symbols-outlined text-[24px]" aria-hidden="true">local_mall</span>
+        <span data-cart-count class="absolute right-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-secondary px-1 font-label-sm text-[10px] font-bold leading-none text-on-secondary {{ 'hidden' if not cart_count }}">{{ cart_count }}</span>
+      </a>
+      <a href="{{ url_for('orders.profile') if current_user else url_for('auth.login') }}" aria-label="{{ 'Mi perfil' if current_user else 'Iniciar sesión' }}" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary font-label-sm text-label-sm text-on-primary">
+        {% if current_user %}{{ current_user.initials }}{% else %}<span class="material-symbols-outlined text-[18px]" aria-hidden="true">person</span>{% endif %}
+      </a>
+    </div>
+  </div>
+</header>

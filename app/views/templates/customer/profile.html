@@ -1,0 +1,75 @@
+{% extends "layouts/customer.html" %}
+{% from "partials/ui.html" import csrf, stage_badge, empty_state %}
+{% set nav_active = 'perfil' %}
+{% set page_label = 'Mi perfil' %}
+{% block title %}Mi perfil · {{ cafe.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto w-full max-w-[1140px] px-margin py-space-lg lg:px-gutter lg:py-space-xl">
+  <div class="grid grid-cols-1 items-start gap-space-lg lg:grid-cols-12 lg:gap-space-xl">
+
+    {# Cuenta y Moka Club #}
+    <aside class="flex flex-col gap-space-lg lg:col-span-4">
+      <div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-sm">
+        <div class="flex items-center gap-space-md">
+          <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary font-headline-md text-headline-md text-on-primary">{{ current_user.initials }}</div>
+          <div class="min-w-0">
+            <h1 class="truncate font-headline-sm text-headline-sm font-semibold text-primary">{{ current_user.name }}</h1>
+            <p class="truncate font-body-sm text-body-sm text-on-surface-variant">{{ current_user.email }}</p>
+            <span class="chip mt-1 bg-secondary-fixed font-semibold text-on-secondary-fixed">{{ current_user.role_label }}</span>
+          </div>
+        </div>
+        <div class="mt-space-lg flex flex-col gap-space-sm">
+          {% if current_user.is_staff %}
+            <a href="{{ url_for('admin_orders.index') }}" class="btn-primary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">dashboard</span>Ir al panel de barra</a>
+          {% endif %}
+          <form method="post" action="{{ url_for('auth.logout') }}">{{ csrf() }}
+            <button type="submit" class="btn-soft w-full"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">logout</span>Cerrar sesión</button>
+          </form>
+        </div>
+      </div>
+
+      {% if not current_user.is_staff %}
+      <div class="relative overflow-hidden rounded-xl bg-primary p-space-lg text-on-primary shadow-sm">
+        <div class="pointer-events-none absolute -bottom-6 -right-6 h-32 w-32 rounded-full bg-secondary/15 blur-2xl"></div>
+        <div class="mb-space-md flex items-center gap-space-xs"><span class="material-symbols-outlined text-[24px] text-secondary-fixed" aria-hidden="true">workspace_premium</span><span class="font-label-lg text-label-lg font-semibold">Moka Club</span></div>
+        <div class="font-headline-xl-mobile text-headline-xl-mobile font-semibold">{{ current_user.beans }} <span class="font-body-md text-body-md font-normal text-primary-fixed-dim">granos</span></div>
+        <p class="mt-1 font-body-md text-body-md text-primary-fixed-dim">{{ current_user.tier }}{% if current_user.beans_to_reward > 0 %} · te faltan <strong class="text-on-primary">{{ current_user.beans_to_reward }}</strong> para tu próxima recompensa{% endif %}</p>
+        <div class="mt-space-md h-2.5 w-full overflow-hidden rounded-full bg-surface-container-highest/20 p-0.5"><div class="h-full rounded-full bg-secondary-fixed" style="width: {{ current_user.reward_progress }}%"></div></div>
+        <div class="mt-space-md grid grid-cols-2 gap-space-sm text-center">
+          <div class="rounded-lg bg-on-primary/10 p-space-sm"><div class="font-headline-sm text-headline-sm font-semibold">{{ stats.count }}</div><div class="font-label-sm text-label-sm text-primary-fixed-dim">Pedidos</div></div>
+          <div class="rounded-lg bg-on-primary/10 p-space-sm"><div class="font-headline-sm text-headline-sm font-semibold">{{ stats.avg_cents|money }}</div><div class="font-label-sm text-label-sm text-primary-fixed-dim">Ticket promedio</div></div>
+        </div>
+      </div>
+      {% endif %}
+    </aside>
+
+    {# Historial #}
+    <section class="lg:col-span-8" aria-labelledby="orders-title">
+      <div class="mb-space-md flex items-end justify-between">
+        <h2 id="orders-title" class="font-headline-lg-mobile text-headline-lg-mobile text-primary lg:font-headline-lg lg:text-headline-lg">Mis pedidos</h2>
+        <a href="{{ url_for('menu.index') }}" class="font-label-md text-label-md font-semibold text-secondary hover:text-primary">Pedir algo nuevo</a>
+      </div>
+      {% if orders %}
+        <div class="flex flex-col gap-space-sm">
+          {% for o in orders %}
+          <a href="{{ url_for('orders.detail', code=o.code) }}" class="flex items-center justify-between gap-space-md rounded-xl bg-surface-container-lowest p-space-md shadow-sm transition-all hover:shadow-md">
+            <div class="flex min-w-0 items-center gap-space-md">
+              <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl {{ o.stage_info.tile }}"><span class="material-symbols-outlined" aria-hidden="true">{{ o.stage_info.icon }}</span></div>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2"><span class="font-label-lg text-label-lg font-bold text-primary">#{{ o.code }}</span>{{ stage_badge(o) }}</div>
+                <p class="truncate font-body-sm text-body-sm text-on-surface-variant">{{ o.items|map(attribute='name')|join(', ') }}</p>
+                <p class="font-label-sm text-label-sm text-outline">{{ o.created_at|friendly }} · {{ o.fulfillment_label }}</p>
+              </div>
+            </div>
+            <div class="text-right"><span class="font-headline-sm text-headline-sm font-semibold text-primary">{{ o.total_cents|money }}</span><span class="material-symbols-outlined block text-[18px] text-outline" aria-hidden="true">chevron_right</span></div>
+          </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        {{ empty_state('receipt_long', 'Aún no tienes pedidos', 'Cuando hagas tu primer pedido aparecerá aquí para que puedas seguirlo en vivo.', url_for('menu.index'), 'Ver el menú') }}
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,36 @@
+<footer class="hidden w-full bg-surface-container-low pb-space-lg pt-space-xl shadow-[0_-1px_12px_rgba(61,39,29,0.03)] lg:block">
+  <div class="mx-auto w-full max-w-[1140px] px-gutter">
+    <div class="mb-space-xl grid grid-cols-1 gap-space-xl md:grid-cols-3">
+      <div>
+        <div class="mb-space-sm flex items-center gap-space-sm">
+          <img src="{{ url_for('static', filename='img/logo.svg') }}" alt="" class="h-8 w-8 rounded-lg">
+          <span class="font-headline-md text-headline-md leading-none text-primary-container">{{ cafe.name }}</span>
+        </div>
+        <p class="font-body-md text-body-md leading-relaxed text-on-surface-variant">{{ cafe.tagline }}. Preparamos cada bebida al momento y horneamos cada mañana.</p>
+        <div class="mt-space-md flex items-center gap-space-xs text-secondary">
+          <span class="material-symbols-outlined text-[20px]" aria-hidden="true">eco</span>
+          <span class="font-label-sm text-label-sm font-semibold">Vasos y empaques 100% compostables</span>
+        </div>
+      </div>
+      <div>
+        <h4 class="mb-space-md font-headline-sm text-headline-sm text-primary-container">Horarios de Atención</h4>
+        <div class="space-y-space-sm font-body-sm text-body-sm text-on-surface-variant">
+          {% for days, hours in cafe.hours %}
+            <div class="rounded-lg bg-surface-container p-space-sm"><div class="mb-space-xs font-label-md text-label-md font-semibold text-on-surface">{{ days }}</div><div>{{ hours }}</div></div>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <h4 class="mb-space-md font-headline-sm text-headline-sm text-primary-container">Dónde estamos</h4>
+        <div class="space-y-space-sm font-body-sm text-body-sm text-on-surface-variant">
+          <div class="flex items-start gap-space-sm"><span class="material-symbols-outlined text-[20px] text-secondary" aria-hidden="true">pin_drop</span>
+            <div><div class="font-label-md text-label-md font-semibold text-on-surface">{{ cafe.location_name }}</div><div>{{ cafe.address }}</div></div></div>
+          <div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-[20px] text-secondary" aria-hidden="true">call</span><span>{{ cafe.phone }}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="flex flex-col items-center justify-between gap-space-md pt-space-md font-body-sm text-body-sm text-on-surface-variant md:flex-row">
+      <p>© {{ cafe.name }}. Elaborado con dedicación y paciencia.</p>
+    </div>
+  </div>
+</footer>

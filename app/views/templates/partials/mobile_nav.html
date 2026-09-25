@@ -1,0 +1,15 @@
+{% set cart_count = cart_info()[0] %}
+<nav class="pb-safe fixed bottom-0 z-50 w-full bg-surface/90 shadow-[0_-2px_16px_rgba(61,39,29,0.06)] backdrop-blur-xl lg:hidden no-print" aria-label="Navegación principal">
+  <div class="mx-auto flex h-16 max-w-lg items-center justify-around px-space-xs">
+    {% for key, label, glyph, endpoint in [('menu', 'Menú', 'coffee', 'menu.index'), ('favoritos', 'Favoritos', 'favorite', 'menu.favorites'), ('carrito', 'Carrito', 'shopping_bag', 'cart.view'), ('perfil', 'Mi Perfil', 'account_circle', 'orders.profile')] %}
+      <a href="{{ url_for(endpoint) }}" {% if nav_active == key %}aria-current="page"{% endif %}
+         class="relative flex h-12 min-w-[64px] flex-col items-center justify-center gap-0.5 transition-colors {{ 'font-semibold text-primary' if nav_active == key else 'text-on-surface-variant hover:text-primary' }}">
+        <span class="relative flex items-center justify-center">
+          <span class="material-symbols-outlined text-[24px] {{ 'fill-1' if nav_active == key }}" aria-hidden="true">{{ glyph }}</span>
+          {% if key == 'carrito' %}<span data-cart-count class="absolute -right-2 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-secondary px-1 font-label-sm text-[9px] font-bold text-on-secondary {{ 'hidden' if not cart_count }}">{{ cart_count }}</span>{% endif %}
+        </span>
+        <span class="font-label-sm text-label-sm">{{ label }}</span>
+      </a>
+    {% endfor %}
+  </div>
+</nav>

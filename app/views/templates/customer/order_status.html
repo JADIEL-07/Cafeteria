@@ -1,0 +1,234 @@
+{% extends "layouts/customer.html" %}
+{% from "partials/ui.html" import csrf, product_image, stage_badge %}
+{% set nav_active = 'perfil' %}
+{% set page_label = 'Pedido ' ~ order.code %}
+{% block title %}Pedido {{ order.code }} · {{ cafe.name }}{% endblock %}
+{% block body_attrs %}data-poll-url="{{ url_for('orders.state', code=order.code) }}" data-poll-key="updated" data-poll-value="{{ order.updated_at.isoformat() }}"{% endblock %}
+
+{% block content %}
+{% set stage = order.stage %}
+{% set steps = [
+  ('Pedido recibido', 'receipt_long', order.created_at),
+  ('Pago confirmado', 'payments', order.paid_at),
+  ('En preparación', 'coffee_maker', order.accepted_at),
+  ('Listo para retiro', 'notifications_active', order.ready_at),
+  ('Entregado', 'check_circle', order.delivered_at)] %}
+<div class="mx-auto w-full max-w-[1140px] space-y-space-lg px-margin py-space-lg lg:space-y-space-xl lg:px-gutter lg:py-space-xl">
+
+  {# Cabecera #}
+  <header class="flex flex-col gap-space-lg rounded-xl bg-surface-container-lowest p-space-lg shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <div class="flex items-start gap-space-md">
+      <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-sm {{ 'bg-secondary-fixed text-secondary' if stage not in ('cancelled', 'pending_payment') else ('bg-error-container text-on-error-container' if stage == 'pending_payment' else 'bg-surface-container text-on-surface-variant') }}">
+        <span class="material-symbols-outlined fill-1 text-[32px]" aria-hidden="true">{{ order.stage_info.icon }}</span>
+      </div>
+      <div class="min-w-0">
+        <div class="mb-1 flex flex-wrap items-center gap-2">
+          {{ stage_badge(order) }}
+          {% if order.payment_status == 'pagado' and order.payment_method == 'efectivo' %}<span class="chip bg-tertiary-fixed font-semibold uppercase tracking-wider text-on-tertiary-fixed"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">verified</span>Efectivo validado en barra</span>{% endif %}
+        </div>
+        <h1 class="font-headline-xl-mobile text-headline-xl-mobile tracking-tight text-primary lg:font-headline-xl lg:text-headline-xl">Orden #{{ order.code }}</h1>
+        <p class="mt-0.5 flex flex-wrap items-center gap-space-xs font-body-md text-body-md text-on-surface-variant">
+          <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">{{ 'table_restaurant' if order.fulfillment == 'mesa' else 'storefront' }}</span>
+          {{ order.fulfillment_label }} • <strong class="font-label-lg text-label-lg text-primary">{{ cafe.location_name }}</strong> ({{ cafe.address }})
+        </p>
+      </div>
+    </div>
+    <div class="no-print flex flex-wrap items-center gap-space-sm">
+      <button type="button" onclick="window.print()" class="btn-soft !px-4"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">print</span>Imprimir recibo</button>
+      <a href="tel:{{ cafe.phone|replace(' ', '') }}" class="btn-soft !bg-surface-container-lowest !text-secondary hover:!text-on-secondary-container"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">support_agent</span>Ayuda</a>
+      {% if order.can_cancel %}
+        <form method="post" action="{{ url_for('orders.cancel', code=order.code) }}" data-confirm="¿Cancelar el pedido {{ order.code }}?{{ ' Se te reembolsará el total.' if order.payment_status == 'pagado' }}">{{ csrf() }}
+          <button type="submit" class="btn-danger !px-4"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">cancel</span>Cancelar pedido</button>
+        </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <div class="grid grid-cols-1 items-start gap-space-lg lg:grid-cols-12 lg:gap-space-xl">
+    {# ---------- Izquierda: seguimiento ---------- #}
+    <section class="flex flex-col gap-space-lg lg:col-span-7">
+
+      {# Código de retiro #}
+      <div class="relative overflow-hidden rounded-xl bg-surface-container-lowest p-space-lg shadow-sm">
+        <div class="flex flex-col items-center justify-between gap-space-lg sm:flex-row">
+          <div class="space-y-space-sm text-center sm:text-left">
+            <span class="block font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant">Código para retirar en barra</span>
+            <div class="flex items-center justify-center gap-space-sm sm:justify-start">
+              <span class="font-headline-xl text-headline-xl font-bold tracking-tight text-primary">#{{ order.pickup_pin }}</span>
+              <button type="button" data-copy="{{ order.pickup_pin }}" title="Copiar código" aria-label="Copiar código de retiro" class="no-print flex h-9 w-9 items-center justify-center rounded-full bg-surface-container text-on-surface-variant transition-colors hover:bg-surface-container-high"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">content_copy</span></button>
+            </div>
+            {% if order.is_open %}
+              <div class="inline-flex items-center gap-2 rounded-full bg-secondary-fixed/50 px-3 py-1.5 text-on-secondary-fixed">
+                <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">schedule</span>
+                <span class="font-label-md text-label-md">
+                  {% if stage == 'pending_payment' %}Paga en barra para que empecemos
+                  {% elif stage == 'ready' %}¡Tu pedido está listo!
+                  {% else %}Listo en aprox. <strong>{{ wait[0] }} - {{ wait[1] }} minutos</strong>{% endif %}
+                </span>
+              </div>
+            {% endif %}
+          </div>
+          <div class="flex flex-col items-center gap-1 rounded-xl bg-surface-container-low p-space-md text-center">
+            <span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Total</span>
+            <span class="font-headline-lg text-headline-lg font-bold text-primary">{{ order.total_cents|money }}</span>
+            <span class="font-label-sm text-label-sm text-on-surface-variant">{{ order.payment_method_label }}</span>
+          </div>
+        </div>
+      </div>
+
+      {# Estado #}
+      {% if stage == 'cancelled' %}
+        <div class="flex items-start gap-space-md rounded-xl bg-surface-container-low p-space-lg">
+          <span class="material-symbols-outlined text-[28px] text-on-surface-variant" aria-hidden="true">cancel</span>
+          <div>
+            <h2 class="font-headline-sm text-headline-sm text-primary">Pedido cancelado</h2>
+            <p class="font-body-md text-body-md text-on-surface-variant">{{ order.cancel_reason or 'Este pedido fue cancelado.' }}{% if order.payment_status == 'reembolsado' %} Te reembolsamos {{ order.total_cents|money }}.{% else %} No se realizó ningún cobro.{% endif %}</p>
+          </div>
+        </div>
+      {% else %}
+        <div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-sm">
+          <h2 class="mb-space-md font-headline-sm text-headline-sm text-primary">Estado de tu pedido</h2>
+          {% set current = namespace(index=steps|length - 1) %}
+          {% for label, glyph, at in steps %}{% if at is none and current.index == steps|length - 1 %}{% set current.index = loop.index0 %}{% endif %}{% endfor %}
+          <ol class="flex flex-col gap-0">
+            {% for label, glyph, at in steps %}
+              {% set done = at is not none %}
+              {% set is_current = loop.index0 == current.index and not done %}
+              <li class="flex gap-space-md">
+                <div class="flex flex-col items-center">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {{ 'bg-primary-container text-on-primary' if done else ('bg-secondary-fixed text-on-secondary-fixed ring-4 ring-secondary-fixed/50' if is_current else 'bg-surface-container text-outline') }}">
+                    <span class="material-symbols-outlined text-[18px] {{ 'fill-1' if done }}" aria-hidden="true">{{ 'check' if done else glyph }}</span>
+                  </span>
+                  {% if not loop.last %}<span class="my-1 h-6 w-0.5 {{ 'bg-primary-container' if done else 'bg-outline-variant' }}"></span>{% endif %}
+                </div>
+                <div class="pb-space-xs pt-1.5">
+                  <span class="block font-label-lg text-label-lg {{ 'text-primary' if done or is_current else 'text-outline' }}">{{ label }}</span>
+                  <span class="block font-body-sm text-body-sm text-on-surface-variant">
+                    {% if done %}{{ at|friendly }}{% elif is_current %}{{ 'Esperando cobro en barra' if label == 'Pago confirmado' else 'En curso...' }}{% else %}Pendiente{% endif %}
+                  </span>
+                </div>
+              </li>
+            {% endfor %}
+          </ol>
+        </div>
+      {% endif %}
+
+      {# Barista #}
+      {% if order.is_open %}
+      <div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-sm">
+        <div class="flex items-center gap-space-md">
+          <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-secondary-fixed text-on-secondary-fixed"><span class="material-symbols-outlined text-[28px]" aria-hidden="true">{{ 'person_check' if order.accepted_by else 'hourglass_top' }}</span></div>
+          <div>
+            {% if order.accepted_by %}
+              <h3 class="font-label-lg text-label-lg font-bold text-primary">{{ order.accepted_by.name }}</h3>
+              <p class="mt-0.5 font-body-sm text-body-sm italic text-on-surface-variant">Cuidando cada detalle de tu pedido: {{ order.items[0].name }}{% if order.items|length > 1 %} y {{ order.items|length - 1 }} más{% endif %}.</p>
+            {% else %}
+              <h3 class="font-label-lg text-label-lg font-bold text-primary">Un barista tomará tu pedido</h3>
+              <p class="mt-0.5 font-body-sm text-body-sm text-on-surface-variant">{{ 'En cuanto el pago esté confirmado, empezamos.' if order.payment_status != 'pagado' else 'Estás en la cola de barra.' }}</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="no-print space-y-space-sm">
+        {% if order.arrived_at %}
+          <div class="flex items-center justify-center gap-space-sm rounded-xl bg-tertiary-fixed px-4 py-4 font-label-lg text-label-lg text-on-tertiary-fixed"><span class="material-symbols-outlined" aria-hidden="true">directions_walk</span>La barra ya sabe que estás aquí ({{ order.arrived_at|friendly }})</div>
+        {% else %}
+          <form method="post" action="{{ url_for('orders.arrived', code=order.code) }}">{{ csrf() }}
+            <button type="submit" class="btn-primary btn-lg w-full !py-4"><span class="material-symbols-outlined text-[22px]" aria-hidden="true">directions_walk</span>Notificar "Ya estoy en la cafetería"</button>
+          </form>
+        {% endif %}
+        <a href="https://www.google.com/maps/search/?api=1&query={{ (cafe.location_name ~ ', ' ~ cafe.address)|urlencode }}" target="_blank" rel="noopener noreferrer" class="btn-soft w-full !bg-surface-container-low"><span class="material-symbols-outlined text-[20px] text-secondary" aria-hidden="true">map</span>Ver indicaciones / Mapa {{ cafe.location_name }}</a>
+      </div>
+
+      {% if order.status == 'nuevo' %}
+      <details class="no-print group rounded-xl bg-surface-container-low p-space-md">
+        <summary class="flex cursor-pointer list-none items-center gap-space-sm font-label-md text-label-md font-semibold text-primary"><span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">edit_note</span>Modificar notas para el barista<span class="material-symbols-outlined ml-auto text-[18px] transition-transform group-open:rotate-180" aria-hidden="true">expand_more</span></summary>
+        <form method="post" action="{{ url_for('orders.update_notes', code=order.code) }}" class="mt-space-sm flex flex-col gap-space-sm">{{ csrf() }}
+          <textarea name="notes" rows="2" maxlength="200" class="field resize-none" placeholder="Ej. Sin azúcar, poco hielo...">{{ order.notes or '' }}</textarea>
+          <button type="submit" class="btn-soft self-end">Guardar notas</button>
+        </form>
+      </details>
+      {% endif %}
+      {% endif %}
+    </section>
+
+    {# ---------- Derecha: resumen y Moka Club ---------- #}
+    <aside class="flex flex-col gap-space-lg lg:col-span-5">
+      {% if current_user and current_user.id == order.user_id %}
+      <div class="relative overflow-hidden rounded-xl bg-primary p-space-lg text-on-primary shadow-sm">
+        <div class="pointer-events-none absolute -bottom-6 -right-6 h-32 w-32 rounded-full bg-secondary/15 blur-2xl"></div>
+        <div class="mb-space-md flex items-center justify-between gap-space-sm">
+          <div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[24px] text-secondary-fixed" aria-hidden="true">workspace_premium</span><span class="font-label-lg text-label-lg font-semibold text-on-primary">Moka Club</span></div>
+          <span class="rounded-full bg-secondary-fixed px-2.5 py-0.5 font-label-sm text-label-sm font-bold tracking-tight text-on-secondary-fixed">{% if order.payment_status == 'reembolsado' %}Granos devueltos{% elif order.payment_status == 'pagado' %}+{{ order.beans_earned }} Granos{% else %}+{{ order.total_cents // 100 }} al pagar{% endif %}</span>
+        </div>
+        <p class="font-body-md text-body-md leading-relaxed text-primary-fixed-dim">
+          {% if order.payment_status == 'pagado' %}¡Sumados con éxito!{% else %}Suma granos en cuanto se confirme el pago.{% endif %}
+          {% if current_user.beans_to_reward > 0 %}Estás a <strong class="font-semibold text-on-primary">{{ current_user.beans_to_reward }} granos</strong> de tu próxima recompensa.{% else %}¡Ya alcanzaste tu recompensa!{% endif %}
+        </p>
+        <div class="mt-space-md space-y-1.5">
+          <div class="flex justify-between font-label-sm text-label-sm text-primary-fixed-dim"><span>{{ current_user.tier }}</span><span class="font-bold text-on-primary">{{ current_user.beans }} / {{ current_user.reward_goal }} Granos</span></div>
+          <div class="h-2.5 w-full overflow-hidden rounded-full bg-surface-container-highest/20 p-0.5"><div class="h-full rounded-full bg-secondary-fixed transition-all duration-1000" style="width: {{ current_user.reward_progress }}%"></div></div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-sm">
+        <div class="flex items-center justify-between pb-space-sm">
+          <h2 class="font-headline-sm text-headline-sm text-primary">Tu Pedido ({{ order.item_count }})</h2>
+          <span class="font-label-sm text-label-sm text-on-surface-variant">{{ order.created_at|friendly }}</span>
+        </div>
+        <div class="mt-space-sm space-y-space-md">
+          {% for item in order.items %}
+          <div class="flex items-center gap-space-md py-space-xs">
+            <div class="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-container">{% if item.product %}{{ product_image(item.product, 'h-full w-full object-cover') }}{% endif %}</div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-space-xs">
+                <h3 class="truncate font-label-lg text-label-lg text-primary">{{ item.name }}</h3>
+                <span class="font-label-lg text-label-lg font-bold text-primary">{{ item.line_total_cents|money }}</span>
+              </div>
+              {% if item.options_text %}<p class="truncate font-body-sm text-body-sm text-on-surface-variant">{{ item.options_text }}</p>{% endif %}
+              <div class="mt-1 flex items-center gap-2"><span class="text-[11px] text-on-surface-variant">Cant: {{ item.qty }}</span>{% if item.notes %}<span class="rounded bg-surface-container px-1.5 py-0.5 text-[11px] text-on-surface-variant">{{ item.notes }}</span>{% endif %}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% if order.notes %}<p class="mt-space-md flex items-start gap-1 rounded-lg bg-surface-container-low p-space-sm font-body-sm text-body-sm italic text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-secondary" aria-hidden="true">edit_note</span>{{ order.notes }}</p>{% endif %}
+
+        <div class="mt-space-lg space-y-2 rounded-xl bg-surface-container-low p-space-md pt-space-md">
+          <div class="flex justify-between font-body-sm text-body-sm text-on-surface-variant"><span>Subtotal productos</span><span class="font-medium text-on-surface">{{ order.subtotal_cents|money }}</span></div>
+          {% if order.discount_cents %}<div class="flex items-center justify-between font-body-sm text-body-sm text-tertiary-container"><span class="inline-flex items-center gap-1"><span class="material-symbols-outlined text-[16px] text-on-tertiary-container" aria-hidden="true">local_offer</span>Cupón {{ order.coupon_code }}</span><span class="font-semibold text-on-tertiary-container">-{{ order.discount_cents|money }}</span></div>{% endif %}
+          <div class="flex justify-between font-body-sm text-body-sm text-on-surface-variant"><span>Impuestos</span><span class="font-medium text-on-surface">{{ order.tax_cents|money }}</span></div>
+          <div class="flex items-baseline justify-between pt-space-xs">
+            <span class="font-headline-sm text-headline-sm font-bold text-primary">{{ 'Total pagado' if order.payment_status == 'pagado' else ('Total reembolsado' if order.payment_status == 'reembolsado' else 'Total a pagar') }}</span>
+            <span class="font-headline-md text-headline-md font-bold text-primary">{{ order.total_cents|money }}</span>
+          </div>
+        </div>
+        <div class="mt-space-md flex flex-wrap items-center justify-between gap-space-sm px-1 font-body-sm text-body-sm text-on-surface-variant">
+          <div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[20px] text-primary" aria-hidden="true">{{ 'credit_card' if order.payment_method == 'tarjeta' else 'payments' }}</span><span>{{ order.payment_method_label }}</span></div>
+          {% if order.transaction_ref %}<span class="font-mono text-[11px]">{{ order.transaction_ref }}</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-space-md rounded-xl bg-surface-container-low p-space-md">
+        <div class="flex items-center gap-space-sm">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-primary"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">pin_drop</span></div>
+          <div><p class="font-label-md text-label-md font-bold text-primary">{{ cafe.location_name }}</p><p class="font-body-sm text-body-sm text-on-surface-variant">{{ cafe.address }} • {{ cafe.hours[0][0] }}: {{ cafe.hours[0][1] }}</p></div>
+        </div>
+      </div>
+
+      <a href="{{ url_for('orders.profile') }}" class="no-print inline-flex items-center justify-center gap-space-xs font-label-md text-label-md font-semibold text-secondary hover:text-primary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>Volver a mis pedidos</a>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-copy]');
+    if (!btn || !navigator.clipboard) return;
+    navigator.clipboard.writeText(btn.dataset.copy).then(function () { window.showToast('Código copiado', 'info'); });
+  });
+</script>
+{% endblock %}

@@ -8,10 +8,11 @@ import secrets
 from pathlib import Path
 
 import click
-from flask import Flask, g, jsonify, render_template, request
-from sqlalchemy import select
+from flask import Flask, abort, g, jsonify, render_template, request
+from sqlalchemy.exc import DataError
 
 from .config import Config
+from .database import init_database, seed_once
 from .extensions import csrf, db
 from .utils import timefmt
 from .utils.money import format_money, format_qty
@@ -56,20 +57,27 @@ def create_app(config_object=Config):
     _register_cli(app)
 
     with app.app_context():
-        db.create_all()
-        if app.config.get("SEED_ON_FIRST_RUN") and not db.session.scalar(select(models.User.id).limit(1)):
+        init_database()
+        if app.config.get("SEED_ON_FIRST_RUN"):
             from .seed import seed_database
 
-            seed_database(demo=app.config.get("DEMO_DATA", True))
-            app.logger.warning(
-                "Base de datos creada. Administrador: %s. Si no definiste ADMIN_PASSWORD, cambia la contraseña por defecto.",
-                app.config["ADMIN_EMAIL"],
-            )
+            if seed_once(lambda: seed_database(demo=app.config.get("DEMO_DATA", True))):
+                app.logger.warning(
+                    "Base de datos creada. Administrador: %s. Si no definiste ADMIN_PASSWORD, cambia la contraseña por defecto.",
+                    app.config["ADMIN_EMAIL"],
+                )
     return app
 
 
 def _register_request_hooks(app):
     from .utils.auth import load_current_user
+
+    @app.before_request
+    def reject_nul_bytes():
+        """El byte NUL nunca es un dato legítimo y PostgreSQL lo rechaza en cualquier texto."""
+        nul = "\x00"
+        if nul in request.path or any(nul in key or any(nul in v for v in values) for form in (request.args, request.form) for key, values in form.lists()):
+            abort(400)
 
     app.before_request(load_current_user)
 
@@ -129,6 +137,12 @@ def _register_error_handlers(app):
     def bad_request(_):
         return render_error(400, "Solicitud no válida", "No pudimos procesar la solicitud. Recarga la página e inténtalo de nuevo.")
 
+    @app.errorhandler(DataError)
+    def invalid_data(_):
+        """Valor que la base de datos no acepta (fuera de rango, demasiado largo…): es un error del cliente, no del servidor."""
+        db.session.rollback()
+        return render_error(400, "Datos no válidos", "Alguno de los valores enviados no es aceptado. Revísalos e inténtalo de nuevo.")
+
     @app.errorhandler(401)
     def unauthorized(_):
         return render_error(401, "Inicia sesión", "Necesitas iniciar sesión para continuar.")
@@ -154,12 +168,16 @@ def _register_error_handlers(app):
 def _register_cli(app):
     @app.cli.command("reset-db")
     @click.option("--demo/--no-demo", default=True, help="Cargar clientes y pedidos de ejemplo.")
-    def reset_db(demo):
+    @click.option("--yes", is_flag=True, help="No pedir confirmación (para bases remotas como Supabase).")
+    def reset_db(demo, yes):
         """Borra la base de datos y la vuelve a crear con el catálogo inicial."""
         from .seed import seed_database
 
+        if db.engine.dialect.name != "sqlite" and not yes:
+            target = db.engine.url.render_as_string(hide_password=True)
+            click.confirm(f"Se borrarán TODAS las tablas de la app en {target}. ¿Continuar?", abort=True)
         db.drop_all()
-        db.create_all()
+        init_database()
         seed_database(demo=demo)
         click.echo("Base de datos reiniciada.")
 

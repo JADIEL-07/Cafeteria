@@ -2,7 +2,7 @@
 from app.extensions import db
 from app.models import User
 
-from .conftest import ADMIN, BARISTA, CLIENT, OTHER, add_to_cart, login
+from tests.helpers import ADMIN, BARISTA, CLIENT, OTHER, add_to_cart, login
 
 
 def user(credentials):

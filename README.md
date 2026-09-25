@@ -56,7 +56,12 @@ app/
     │   ├── admin/           orders · inventory · finance · users
     │   └── errors/
     └── static/              css/ · js/ · img/logo.svg · img/products/*.jpg
-tests/                       102 pruebas (pytest)
+conftest.py                  registra los fixtures de tests/fixtures
+tests/                       648 pruebas (pytest)
+├── fixtures/                un módulo de fixtures por modelo (usuarios, catálogo, inventario, cupones, carritos, pedidos, cartera, favoritos)
+├── models/                  pruebas unitarias, un archivo por modelo
+├── utils/                   dinero y fechas
+└── integration/             rutas HTTP, permisos, pantallas y robustez
 ```
 
 ## Reglas de negocio
@@ -106,7 +111,25 @@ python -m ruff check .                        # lint
 En cada *push* y *pull request* GitHub Actions ejecuta el lint y las pruebas en Python 3.11, 3.12 y 3.13
 (`.github/workflows/ci.yml`); Dependabot propone las actualizaciones de dependencias y de acciones.
 
-Cubren carrito y precios, flujo completo de pedidos (incluida la regla de pago), inventario, cartera, permisos por rol, CSRF, redirecciones seguras, exportaciones CSV, el renderizado de todas las pantallas y una prueba de robustez que golpea cada ruta con datos basura (ninguna puede dar error 500).
+**Por modelo** (`tests/models/`, 513 pruebas): `User`, `Category`, `Product`, `Modifier`, `ProductIngredient`, `InventoryItem`, `InventoryMovement`, `Coupon`, `Favorite`, `Cart`, `LedgerEntry`, `Order` y `OrderItem`, más las bases comunes (`unit_of_work`, errores de dominio). Cada prueba corre en una base SQLite en memoria propia y con un hash de contraseña barato, así toda la suite tarda menos de un minuto.
+
+**Fixtures** (`tests/fixtures/`, uno por modelo) — se cargan desde el `conftest.py` de la raíz con `pytest_plugins` y se pueden combinar:
+
+| Módulo | Fixtures principales |
+| --- | --- |
+| `application` | `app`, `client`, `session` (config de pruebas, base en memoria) |
+| `users` | `client_user`, `barista_user`, `admin_user`, `silver_user`, `vip_user`, `inactive_user`, `user_factory` |
+| `catalog` | `category`, `bakery_category`, `drink` (personalizable), `pastry`, `inactive_product`, `drink_modifiers`, `category_factory`, `product_factory`, `modifier_factory`, `recipe_factory` |
+| `inventory` | `coffee_item`, `milk_item`, `cup_item`, `butter_item`, `warning_item`, `critical_item`, movimientos de compra / ajuste / merma / consumo, `item_factory` |
+| `coupons` | `fixed_coupon`, `percent_coupon`, `inactive_coupon`, `exhausted_coupon`, `coupon_factory` |
+| `carts` | `cart`, `filled_cart`, `cart_summary`, `cart_store` |
+| `orders` | `kitchen` (bebida, pastelería, opciones, recetas e insumos), `order_factory`, `card_order`, `cash_order`, `accepted_order`, `ready_order`, `delivered_order`, `cancelled_paid_order`, `cancelled_unpaid_order` |
+| `ledger` | `sale_entry`, `refund_entry`, `purchase_entry`, `adjustment_in_entry`, `adjustment_out_entry`, `ledger_dataset` (con las cifras esperadas), `ledger_factory` |
+| `favorites` | `favorite`, `favorite_factory` |
+
+**Integración** (`tests/integration/`, 83 pruebas): carrito y precios, flujo completo de pedidos (incluida la regla de pago), inventario, cartera, permisos por rol, CSRF, redirecciones seguras, exportaciones CSV, el renderizado de todas las pantallas y una prueba de robustez que golpea cada ruta con datos basura (ninguna puede dar error 500).
+
+La cobertura ronda el **97 %** (modelos entre 98 y 100 %). El CI la publica como artefacto (`coverage-xml`).
 
 ## Limitaciones conocidas
 

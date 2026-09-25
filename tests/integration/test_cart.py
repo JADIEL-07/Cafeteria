@@ -3,7 +3,7 @@ from sqlalchemy import select
 from app.extensions import db
 from app.models import Cart, Modifier
 
-from .conftest import CLIENT, add_to_cart, login, product_id
+from tests.helpers import CLIENT, add_to_cart, login, product_id
 
 
 def summary_from(client):

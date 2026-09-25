@@ -64,6 +64,8 @@ class InventoryItem(db.Model):
     # ---- estado ---------------------------------------------------------------
     @property
     def status(self):
+        if self.min_stock <= 0:  # sin mínimo definido no hay alerta posible
+            return STATUS_OK
         if self.stock <= self.min_stock * 0.5:
             return STATUS_CRITICAL
         if self.stock < self.min_stock:

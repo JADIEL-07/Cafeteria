@@ -20,6 +20,7 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     WTF_CSRF_TIME_LIMIT = None
+    PASSWORD_HASH_METHOD = "scrypt"
 
     # --- Reglas del negocio ----------------------------------------------
     TAX_BP = 750            # IVA 7.5 % (en puntos básicos, sin decimales flotantes)
@@ -54,5 +55,6 @@ class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite://"
     SECRET_KEY = "test-secret-key"
     WTF_CSRF_ENABLED = False
+    PASSWORD_HASH_METHOD = "pbkdf2:sha256:1000"  # barato: acelera la suite; los hashes siguen siendo válidos
     SEED_ON_FIRST_RUN = False
     DEMO_DATA = False

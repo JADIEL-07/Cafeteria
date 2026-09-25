@@ -1,4 +1,5 @@
 """Usuarios: clientes, baristas y administradores (con programa Moka Club)."""
+import re
 from datetime import datetime
 
 from flask import current_app
@@ -18,6 +19,12 @@ ROLE_LABELS = {ROLE_CLIENT: "Cliente", ROLE_BARISTA: "Barista", ROLE_ADMIN: "Adm
 VIP_BEANS = 100      # a partir de aquí: Granos Dorados VIP
 SILVER_BEANS = 25    # a partir de aquí: Grano Plata
 MIN_PASSWORD = 8
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s.]+$")  # algo@dominio.ext (sin espacios)
+
+
+def hash_password(password):
+    """Hash con el método configurado (scrypt por defecto; las pruebas usan uno más barato)."""
+    return generate_password_hash(password, method=current_app.config.get("PASSWORD_HASH_METHOD", "scrypt"))
 
 
 class User(db.Model):
@@ -48,7 +55,7 @@ class User(db.Model):
         email = cls.normalize_email(email)
         if len(name) < 2:
             raise DomainError("Escribe tu nombre completo.")
-        if "@" not in email or "." not in email.rsplit("@", 1)[-1] or len(email) > 160:
+        if not EMAIL_PATTERN.match(email) or len(email) > 160:
             raise DomainError("Escribe un correo electrónico válido.")
         if len(password or "") < MIN_PASSWORD:
             raise DomainError(f"La contraseña debe tener al menos {MIN_PASSWORD} caracteres.")
@@ -56,7 +63,7 @@ class User(db.Model):
             raise DomainError("Rol no válido.")
         if cls.get_by_email(email):
             raise DomainError("Ya existe una cuenta con ese correo.")
-        user = cls(name=name, email=email, role=role, beans=beans, password_hash=generate_password_hash(password))
+        user = cls(name=name, email=email, role=role, beans=beans, password_hash=hash_password(password))
         if created_at:
             user.created_at = created_at
         db.session.add(user)
@@ -78,7 +85,7 @@ class User(db.Model):
     def set_password(self, password):
         if len(password or "") < MIN_PASSWORD:
             raise DomainError(f"La contraseña debe tener al menos {MIN_PASSWORD} caracteres.")
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = hash_password(password)
 
     # ---- roles ------------------------------------------------------------
     @property
@@ -96,7 +103,8 @@ class User(db.Model):
     # ---- presentación -------------------------------------------------------
     @property
     def first_name(self):
-        return self.name.split()[0] if self.name else ""
+        parts = (self.name or "").split()
+        return parts[0] if parts else ""
 
     @property
     def initials(self):

@@ -9,7 +9,7 @@ from app.config import TestConfig
 from app.extensions import db
 from app.models import Order, Product
 
-from .conftest import login
+from tests.helpers import login
 
 DEMO_ADMIN = ("admin@moka.com", "admin1234")
 DEMO_CLIENT = ("elena@correo.com", "moka1234")

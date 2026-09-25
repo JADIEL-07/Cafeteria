@@ -15,8 +15,9 @@ DEMO_ADMIN = ("admin@moka.com", "admin1234")
 DEMO_CLIENT = ("elena@correo.com", "moka1234")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def demo_app():
+    """Tienda con datos demo. Es de función (no de módulo): con PostgreSQL todas las apps comparten la misma base."""
     class DemoConfig(TestConfig):
         SEED_ON_FIRST_RUN = True
         DEMO_DATA = True
@@ -25,6 +26,7 @@ def demo_app():
     with application.app_context():
         yield application
         db.session.remove()
+        db.engine.dispose()
 
 
 def test_public_pages(demo_app):
@@ -100,6 +102,7 @@ def test_first_run_seeds_a_usable_shop():
         assert client.post("/login", data={"email": "admin@moka.com", "password": "admin1234"}).status_code == 302
         assert client.get("/admin/inventario/").status_code == 200
         db.session.remove()
+        db.engine.dispose()
 
 
 def test_html_has_no_unrendered_template_syntax(demo_app):

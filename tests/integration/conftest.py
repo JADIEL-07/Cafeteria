@@ -25,6 +25,7 @@ def app():
         login_limiter.reset()
         yield application
         db.session.remove()
+        db.engine.dispose()
 
 
 @pytest.fixture()

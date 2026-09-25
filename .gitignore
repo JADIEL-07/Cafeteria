@@ -8,6 +8,11 @@ venv/
 # Datos locales de la aplicación (base de datos y clave de sesión)
 instance/
 
+# Secretos: la cadena de conexión de Supabase vive aquí, nunca en git
+.env
+.env.*
+!.env.example
+
 # Herramientas de desarrollo
 .coverage
 coverage.xml

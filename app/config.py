@@ -6,11 +6,19 @@ constantes del negocio (impuestos, comisión de la pasarela, datos del local).
 import os
 from datetime import timedelta
 
+from dotenv import load_dotenv
+
+from .database import engine_options, normalize_database_url
+
+load_dotenv()  # lee el archivo .env si existe (las variables ya definidas en el entorno tienen prioridad)
+
 
 class Config:
     # --- Infraestructura -------------------------------------------------
-    # Ruta relativa => se guarda en la carpeta ``instance/``.
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "sqlite:///cafeteria.db")
+    # Sin DATABASE_URL se usa SQLite (carpeta ``instance/``). Para Supabase / PostgreSQL:
+    # DATABASE_URL=postgresql://usuario:clave@host:5432/postgres  (ver .env.example)
+    SQLALCHEMY_DATABASE_URI = normalize_database_url(os.environ.get("DATABASE_URL") or "sqlite:///cafeteria.db")
+    SQLALCHEMY_ENGINE_OPTIONS = engine_options(SQLALCHEMY_DATABASE_URI)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     # Si no se define, se genera una clave aleatoria y se guarda en instance/.
     SECRET_KEY = os.environ.get("SECRET_KEY")
@@ -52,7 +60,10 @@ class Config:
 
 class TestConfig(Config):
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = "sqlite://"
+    # Las pruebas NUNCA usan DATABASE_URL (podría ser tu base real): SQLite en memoria, o el
+    # PostgreSQL de pruebas indicado en TEST_DATABASE_URL (se vacía en cada prueba).
+    SQLALCHEMY_DATABASE_URI = normalize_database_url(os.environ.get("TEST_DATABASE_URL") or "sqlite://")
+    SQLALCHEMY_ENGINE_OPTIONS = engine_options(SQLALCHEMY_DATABASE_URI)
     SECRET_KEY = "test-secret-key"
     WTF_CSRF_ENABLED = False
     PASSWORD_HASH_METHOD = "pbkdf2:sha256:1000"  # barato: acelera la suite; los hashes siguen siendo válidos

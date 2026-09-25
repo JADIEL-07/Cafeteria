@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from app.extensions import db
 from app.models import DomainError, InsufficientStock, InventoryItem, InventoryMovement, LedgerEntry
 from app.models.inventory import CATEGORIES, MOV_ADJUSTMENT, MOV_WASTE, UNITS
+from app.utils.money import MAX_CENTS
 
 
 def reload_item(item):
@@ -203,6 +204,17 @@ class TestPurchase:
     def test_zero_cost_is_allowed(self, coffee_item):
         movement = coffee_item.purchase(1, 0)
         assert movement.total_cost_cents == 0
+
+    def test_purchase_total_is_capped_to_what_the_database_can_store(self, coffee_item):
+        """1,000,000 unidades a $1,000,000 no cabe en un INTEGER de PostgreSQL (SQLite lo aceptaba en silencio)."""
+        with pytest.raises(DomainError, match="máximo"):
+            coffee_item.purchase(1_000_000, 100_000_000)
+        assert reload_item(coffee_item).stock == 10
+        assert db.session.scalar(select(LedgerEntry.id)) is None
+
+    def test_purchase_total_at_the_cap_is_accepted(self, coffee_item):
+        movement = coffee_item.purchase(1, MAX_CENTS)
+        assert movement.total_cost_cents == MAX_CENTS
 
     @pytest.mark.parametrize("qty, cost", [(0, 100), (-1, 100), (1, -1)])
     def test_invalid_purchase_changes_nothing(self, coffee_item, qty, cost):

@@ -1,0 +1,142 @@
+{% extends "layouts/customer.html" %}
+{% from "partials/ui.html" import csrf %}
+{% set nav_active = 'perfil' %}
+{% set page_label = 'Mi cuenta' %}
+{% block title %}Iniciar sesión · {{ cafe.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto w-full max-w-[1140px] px-margin py-space-md lg:px-gutter lg:py-space-xl">
+  <div class="grid grid-cols-1 overflow-hidden rounded-xl bg-surface-container-lowest shadow-[0px_10px_32px_-6px_rgba(61,39,29,0.07)] lg:grid-cols-12">
+
+    {# Panel editorial #}
+    <div class="relative flex min-h-[220px] flex-col justify-between overflow-hidden bg-primary-container p-space-lg text-on-primary lg:col-span-5 lg:min-h-[640px] lg:p-space-xl">
+      <div class="absolute inset-0 bg-gradient-to-t from-primary via-primary/60 to-primary/30"></div>
+      <div class="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-secondary-container/20 blur-3xl"></div>
+      <span class="material-symbols-outlined pointer-events-none absolute -bottom-10 -right-8 text-[220px] text-on-primary/5" aria-hidden="true">local_cafe</span>
+
+      <div class="relative z-10 flex flex-col items-start gap-space-sm">
+        <div class="inline-flex items-center gap-space-xs rounded-full bg-surface/15 px-3 py-1.5 font-label-sm text-label-sm uppercase tracking-widest text-surface backdrop-blur-md">
+          <span class="material-symbols-outlined text-[15px] text-secondary-fixed" aria-hidden="true">workspace_premium</span><span>Moka Club</span>
+        </div>
+      </div>
+
+      <div class="relative z-10 my-auto py-space-lg">
+        <p class="mb-space-sm font-headline-lg-mobile text-headline-lg-mobile leading-tight tracking-tight text-surface lg:font-headline-lg lg:text-headline-lg">El ritual de un buen café comienza aquí.</p>
+        <p class="font-body-md text-body-md font-light leading-relaxed text-primary-fixed-dim/90">Haz tus pedidos desde el móvil, sigue su preparación en vivo y retira en barra sin filas.</p>
+        <div class="mt-space-lg hidden flex-col gap-space-xs lg:flex">
+          {% for glyph, text in [('monetization_on', 'Acumula 1 Grano dorado por cada $1 gastado'), ('coffee_maker', 'Seguimiento en vivo de tu pedido en barra'), ('favorite', 'Guarda tus bebidas favoritas para pedir más rápido')] %}
+          <div class="flex items-center gap-space-sm text-surface-bright">
+            <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary-container/25 text-secondary-fixed"><span class="material-symbols-outlined text-[13px]" aria-hidden="true">{{ glyph }}</span></span>
+            <span class="font-label-md text-label-md font-normal text-surface-container-low">{{ text }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="relative z-10 hidden items-center gap-space-md rounded-lg bg-surface/10 p-space-md backdrop-blur-md lg:flex">
+        <span class="material-symbols-outlined text-[28px] text-secondary-fixed" aria-hidden="true">pin_drop</span>
+        <p class="font-label-sm text-label-sm text-surface-dim"><strong class="font-semibold text-surface">{{ cafe.location_name }}</strong><br>{{ cafe.address }}</p>
+      </div>
+    </div>
+
+    {# Formularios #}
+    <div class="flex flex-col justify-between bg-surface-container-lowest p-space-lg sm:p-space-xl lg:col-span-7">
+      <div class="mx-auto my-auto flex w-full max-w-[480px] flex-col justify-center">
+        <div class="mb-space-lg text-left">
+          <div class="mb-space-xs inline-flex items-center gap-1.5 font-label-md text-label-md uppercase tracking-wider text-secondary"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">local_cafe</span><span>Portal de Miembros</span></div>
+          <h1 id="auth-title" class="font-headline-lg text-headline-lg tracking-tight text-primary">{{ 'Únete a Moka Club' if tab == 'register' else 'Bienvenido de vuelta' }}</h1>
+          <p id="auth-subtitle" class="mt-1 font-body-md text-body-md text-on-surface-variant">{{ 'Regístrate para acumular granos y seguir tus pedidos en vivo.' if tab == 'register' else 'Inicia sesión para ver tus pedidos guardados y tus granos Moka Club.' }}</p>
+        </div>
+
+        <div class="mb-space-lg grid grid-cols-2 rounded-lg bg-surface-container p-1" role="tablist">
+          <button type="button" role="tab" id="tab-login" data-auth-tab="login" aria-selected="{{ 'true' if tab != 'register' else 'false' }}" class="flex items-center justify-center gap-2 rounded-md py-2.5 font-label-lg text-label-lg transition-all {{ 'bg-surface-container-lowest font-semibold text-primary shadow-sm' if tab != 'register' else 'text-on-surface-variant hover:text-primary' }}"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">login</span>Iniciar Sesión</button>
+          <button type="button" role="tab" id="tab-register" data-auth-tab="register" aria-selected="{{ 'true' if tab == 'register' else 'false' }}" class="flex items-center justify-center gap-2 rounded-md py-2.5 font-label-lg text-label-lg transition-all {{ 'bg-surface-container-lowest font-semibold text-primary shadow-sm' if tab == 'register' else 'text-on-surface-variant hover:text-primary' }}"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">person_add</span>Crear Cuenta</button>
+        </div>
+
+        {# Iniciar sesión #}
+        <form id="panel-login" method="post" action="{{ url_for('auth.login_post') }}" class="space-y-space-md {{ 'hidden' if tab == 'register' }}" role="tabpanel" aria-labelledby="tab-login">
+          {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+          <div>
+            <label for="login-email" class="field-label">Correo electrónico</label>
+            <div class="relative flex items-center"><span class="material-symbols-outlined pointer-events-none absolute left-3.5 text-[20px] text-outline" aria-hidden="true">mail</span>
+              <input id="login-email" name="email" type="email" required autocomplete="email" value="{{ email|default('') }}" placeholder="tu@correo.com" class="field !pl-10 !py-3"></div>
+          </div>
+          <div>
+            <label for="login-password" class="field-label">Contraseña</label>
+            <div class="relative flex items-center"><span class="material-symbols-outlined pointer-events-none absolute left-3.5 text-[20px] text-outline" aria-hidden="true">lock</span>
+              <input id="login-password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••••••" class="field !pl-10 !pr-12 !py-3">
+              <button type="button" data-toggle-password data-target="login-password" class="absolute right-3 p-1 text-outline hover:text-on-surface focus:outline-none" aria-label="Mostrar u ocultar contraseña"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">visibility</span></button></div>
+          </div>
+          <label class="flex cursor-pointer select-none items-center gap-2.5 pt-1"><input type="checkbox" name="remember" class="h-4 w-4 cursor-pointer rounded accent-primary"><span class="font-body-sm text-body-sm text-on-surface-variant">Recordar mi sesión en este dispositivo</span></label>
+          <button type="submit" class="btn-primary btn-lg mt-space-sm h-12 w-full shadow-md">Ingresar a mi cuenta<span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span></button>
+        </form>
+
+        {# Crear cuenta #}
+        <form id="panel-register" method="post" action="{{ url_for('auth.register_post') }}" class="space-y-space-md {{ 'hidden' if tab != 'register' }}" role="tabpanel" aria-labelledby="tab-register">
+          {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+          <div>
+            <label for="reg-name" class="field-label">Nombre y apellido</label>
+            <div class="relative flex items-center"><span class="material-symbols-outlined pointer-events-none absolute left-3.5 text-[20px] text-outline" aria-hidden="true">badge</span>
+              <input id="reg-name" name="name" type="text" required minlength="2" maxlength="120" autocomplete="name" value="{{ name|default('') }}" placeholder="Elena Rostova" class="field !pl-10 !py-3"></div>
+          </div>
+          <div>
+            <label for="reg-email" class="field-label">Correo electrónico</label>
+            <div class="relative flex items-center"><span class="material-symbols-outlined pointer-events-none absolute left-3.5 text-[20px] text-outline" aria-hidden="true">mail</span>
+              <input id="reg-email" name="email" type="email" required autocomplete="email" value="{{ email|default('') }}" placeholder="tu@correo.com" class="field !pl-10 !py-3"></div>
+          </div>
+          <div>
+            <label for="reg-password" class="field-label">Contraseña <span class="font-normal text-on-surface-variant">(mínimo 8 caracteres)</span></label>
+            <div class="relative flex items-center"><span class="material-symbols-outlined pointer-events-none absolute left-3.5 text-[20px] text-outline" aria-hidden="true">lock</span>
+              <input id="reg-password" name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="••••••••••••" class="field !pl-10 !pr-12 !py-3">
+              <button type="button" data-toggle-password data-target="reg-password" class="absolute right-3 p-1 text-outline hover:text-on-surface focus:outline-none" aria-label="Mostrar u ocultar contraseña"><span class="material-symbols-outlined text-[20px]" aria-hidden="true">visibility</span></button></div>
+          </div>
+          <button type="submit" class="btn-primary btn-lg mt-space-sm h-12 w-full shadow-md">Crear mi cuenta<span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_forward</span></button>
+        </form>
+
+        <div class="mt-space-lg flex items-start gap-space-sm rounded-xl bg-surface-container-low p-space-md">
+          <span class="material-symbols-outlined fill-1 mt-0.5 shrink-0 text-[22px] text-secondary" aria-hidden="true">stars</span>
+          <div class="flex flex-col gap-0.5">
+            <p class="font-label-md text-label-md font-semibold text-primary">¿Aún no eres miembro de Moka Club?</p>
+            <p class="font-body-sm text-body-sm leading-relaxed text-on-surface-variant">Únete gratis en menos de un minuto y acumula <strong class="font-semibold text-secondary">1 grano por cada $1</strong> que gastes.</p>
+            <button type="button" data-auth-tab="register" class="mt-1 self-start font-label-sm text-label-sm font-semibold text-secondary hover:underline">Crear mi cuenta →</button>
+          </div>
+        </div>
+        <div class="mt-space-md text-center">
+          <a href="{{ url_for('menu.index') }}" class="inline-flex items-center gap-1.5 font-label-md text-label-md text-on-surface-variant transition-colors hover:text-primary"><span>Seguir explorando el menú sin cuenta</span><span class="material-symbols-outlined text-[16px]" aria-hidden="true">chevron_right</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var copy = {
+      login: ['Bienvenido de vuelta', 'Inicia sesión para ver tus pedidos guardados y tus granos Moka Club.'],
+      register: ['Únete a Moka Club', 'Regístrate para acumular granos y seguir tus pedidos en vivo.']
+    };
+    var ACTIVE = 'bg-surface-container-lowest font-semibold text-primary shadow-sm'.split(' ');
+    var IDLE = 'text-on-surface-variant hover:text-primary'.split(' ');
+    function show(tab) {
+      document.getElementById('panel-login').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('panel-register').classList.toggle('hidden', tab !== 'register');
+      ['login', 'register'].forEach(function (name) {
+        var btn = document.getElementById('tab-' + name);
+        var on = name === tab;
+        btn.setAttribute('aria-selected', on);
+        ACTIVE.forEach(function (c) { btn.classList.toggle(c, on); });
+        IDLE.forEach(function (c) { btn.classList.toggle(c, !on); });
+      });
+      document.getElementById('auth-title').textContent = copy[tab][0];
+      document.getElementById('auth-subtitle').textContent = copy[tab][1];
+      var first = document.querySelector('#panel-' + tab + ' input:not([type=hidden])');
+      if (first) first.focus();
+    }
+    document.addEventListener('click', function (e) {
+      var trigger = e.target.closest('[data-auth-tab]');
+      if (trigger) show(trigger.dataset.authTab);
+    });
+  })();
+</script>
+{% endblock %}

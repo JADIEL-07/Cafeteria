@@ -1,0 +1,92 @@
+{# Macros de interfaz compartidas por las vistas #}
+
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+
+{% macro icon(name, cls='') %}<span class="material-symbols-outlined {{ cls }}" aria-hidden="true">{{ name }}</span>{% endmacro %}
+
+{# Ruta de la foto: URL externa tal cual, o archivo dentro de static/ #}
+{% macro image_src(p) %}{{ p.image_url if p.image_url.startswith('http') else url_for('static', filename=p.image_url) }}{% endmacro %}
+
+{# Foto del producto con icono de respaldo si la imagen no carga. El contenedor debe ser `relative`. #}
+{% macro product_image(p, cls='h-full w-full object-cover') %}
+  <span class="absolute inset-0 flex items-center justify-center text-outline-variant"><span class="material-symbols-outlined text-[48px]" aria-hidden="true">{{ p.category.icon }}</span></span>
+  {% if p.image_url %}<img src="{{ image_src(p) }}" alt="{{ p.name }}" loading="lazy" referrerpolicy="no-referrer" class="relative {{ cls }}" onerror="this.remove()">{% endif %}
+{% endmacro %}
+
+{% macro favorite_button(p, favorite_ids, cls='') %}
+  {% set is_fav = p.id in favorite_ids %}
+  <button type="button" data-fav-toggle data-url="{{ url_for('menu.toggle_favorite', product_id=p.id) }}" data-login="{{ url_for('auth.login', next=request.full_path.rstrip('?')) }}"
+          aria-label="Guardar {{ p.name }} en favoritos" aria-pressed="{{ 'true' if is_fav else 'false' }}"
+          class="flex items-center justify-center rounded-full bg-surface-container-lowest/85 text-outline shadow-sm backdrop-blur-sm transition-colors hover:text-secondary {{ 'text-secondary' if is_fav }} {{ cls }}">
+    <span class="material-symbols-outlined text-[18px] {{ 'fill-1' if is_fav }}" aria-hidden="true">favorite</span>
+  </button>
+{% endmacro %}
+
+{% macro product_card(p, favorite_ids=()) %}
+<article data-fav-card class="group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-surface-container-lowest shadow-[0_4px_16px_-2px_rgba(61,39,29,0.06)] transition-all duration-300 hover:shadow-xl">
+  <div>
+    <div class="relative aspect-square w-full overflow-hidden bg-surface-container lg:aspect-auto lg:h-52">
+      <a href="{{ url_for('menu.product', slug=p.slug) }}" class="absolute inset-0 z-10" aria-label="Ver {{ p.name }}"></a>
+      {{ product_image(p, 'h-full w-full object-cover transition-transform duration-500 group-hover:scale-105') }}
+      <div class="pointer-events-none absolute left-2 top-2 z-20 flex flex-col items-start gap-1">
+        {% if p.badge %}<span class="rounded-md bg-secondary px-1.5 py-0.5 font-label-sm text-[10px] font-bold uppercase tracking-wide text-on-secondary shadow-sm">{{ p.badge }}</span>{% endif %}
+        {% if 'vegan' in p.tag_list %}<span class="rounded-md bg-tertiary-fixed px-1.5 py-0.5 font-label-sm text-[10px] font-semibold text-on-tertiary-fixed">Vegano</span>{% endif %}
+      </div>
+      {{ favorite_button(p, favorite_ids, 'absolute right-2 top-2 z-20 h-8 w-8') }}
+      <div class="pointer-events-none absolute bottom-2 right-2 z-20 flex items-center gap-1 rounded-md bg-surface-bright/90 px-2 py-0.5 font-label-sm text-label-sm font-medium text-on-surface shadow-sm backdrop-blur-md">
+        <span class="material-symbols-outlined fill-1 text-[14px] text-secondary" aria-hidden="true">stars</span><span>+{{ p.beans }} Granos</span>
+      </div>
+    </div>
+    <div class="p-3 lg:p-space-md">
+      <h3 class="font-headline-sm text-[16px] font-medium leading-snug text-primary transition-colors group-hover:text-secondary lg:text-headline-sm">{{ p.name }}</h3>
+      <p class="mt-1 line-clamp-2 font-body-sm text-[11px] leading-relaxed text-on-surface-variant lg:text-body-sm">{{ p.description }}</p>
+      {% if p.meta_line %}
+      <div class="mt-2 hidden items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant lg:flex">
+        <span class="material-symbols-outlined text-[16px] text-secondary" aria-hidden="true">{{ p.meta_icon or 'local_cafe' }}</span><span>{{ p.meta_line }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="mt-auto flex items-center justify-between gap-2 p-3 pt-0 lg:p-space-md lg:pt-0">
+    <span class="font-label-lg text-label-lg font-bold text-primary lg:font-headline-md lg:text-headline-md lg:font-semibold">{{ p.price_cents|money }}</span>
+    {% if p.is_customizable %}
+      <a href="{{ url_for('menu.product', slug=p.slug) }}" class="btn-primary !px-3 !py-1.5 lg:!px-space-md"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">tune</span><span>Personalizar</span></a>
+    {% else %}
+      <form method="post" action="{{ url_for('cart.add') }}" data-ajax-add>
+        {{ csrf() }}<input type="hidden" name="product_id" value="{{ p.id }}"><input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+        <button type="submit" class="btn-accent !px-3 !py-1.5 lg:!px-space-md"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">add</span><span>Añadir</span></button>
+      </form>
+    {% endif %}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro stage_badge(order, cls='') %}
+  <span class="chip font-semibold {{ order.stage_info.badge }} {{ cls }}"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">{{ order.stage_info.icon }}</span>{{ order.stage_info.label }}</span>
+{% endmacro %}
+
+{% macro empty_state(glyph, title, text, href=None, cta=None) %}
+  <div class="flex flex-col items-center gap-3 rounded-2xl bg-surface-container-lowest px-6 py-14 text-center shadow-sm">
+    <div class="flex h-16 w-16 items-center justify-center rounded-full bg-surface-container text-secondary"><span class="material-symbols-outlined text-[32px]" aria-hidden="true">{{ glyph }}</span></div>
+    <h2 class="font-headline-sm text-headline-sm text-primary">{{ title }}</h2>
+    <p class="max-w-sm font-body-md text-body-md text-on-surface-variant">{{ text }}</p>
+    {% if href %}<a href="{{ href }}" class="btn-primary mt-2">{{ cta }}</a>{% endif %}
+  </div>
+{% endmacro %}
+
+{# Paginación que conserva los filtros de la URL. `page` es el objeto de db.paginate. #}
+{% macro pagination(page, endpoint) %}
+  {% if page.pages > 1 %}
+    {% set args = {} %}
+    {% for key in request.args.keys() if key != 'page' %}{% set _ = args.update({key: request.args.getlist(key)}) %}{% endfor %}
+    <nav class="flex flex-wrap items-center gap-2" aria-label="Paginación">
+      {% if page.has_prev %}<a href="{{ url_for(endpoint, page=page.prev_num, **args) }}" class="rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface">Anterior</a>{% endif %}
+      {% for n in page.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=1) %}
+        {% if n is none %}<span class="px-1 text-on-surface-variant">…</span>
+        {% elif n == page.page %}<span class="rounded-lg bg-primary px-3 py-1.5 font-label-md text-label-md text-on-primary" aria-current="page">{{ n }}</span>
+        {% else %}<a href="{{ url_for(endpoint, page=n, **args) }}" class="rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface">{{ n }}</a>{% endif %}
+      {% endfor %}
+      {% if page.has_next %}<a href="{{ url_for(endpoint, page=page.next_num, **args) }}" class="rounded-lg bg-surface-container-low px-3 py-1.5 font-label-md text-label-md text-on-surface-variant hover:text-on-surface">Siguiente</a>{% endif %}
+    </nav>
+  {% endif %}
+{% endmacro %}

@@ -1,0 +1,44 @@
+{# Componentes reutilizables (Tailwind Play CDN procesa @apply en este bloque). #}
+<style type="text/tailwindcss">
+  @layer components {
+    /* Botones */
+    .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-label-md text-label-md font-semibold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50; }
+    .btn-primary { @apply btn bg-primary text-on-primary shadow-sm hover:bg-primary-container; }
+    .btn-accent { @apply btn bg-secondary text-on-secondary shadow-sm hover:bg-on-secondary-container; }
+    .btn-soft { @apply btn bg-surface-container text-primary hover:bg-surface-container-high; }
+    .btn-danger { @apply btn bg-error-container text-on-error-container hover:opacity-90; }
+    .btn-lg { @apply px-5 py-3.5 font-label-lg text-label-lg; }
+
+    /* Campos de formulario */
+    .field { @apply w-full rounded-xl bg-surface-container-lowest px-3.5 py-2.5 font-body-md text-body-md text-on-surface shadow-[0_1px_3px_rgba(61,39,29,0.08)] transition-all placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-secondary/40; }
+    .field-soft { @apply field bg-surface-container-low shadow-none focus:bg-surface-container-lowest; }
+    .field-label { @apply mb-1.5 block font-label-md text-label-md text-on-surface; }
+
+    /* Tarjetas / etiquetas */
+    .card { @apply rounded-xl bg-surface-container-lowest shadow-sm; }
+    .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-label-sm text-label-sm; }
+
+    /* Opciones seleccionables (radio / checkbox visualmente ocultos + tile) */
+    .opt-input { @apply sr-only; }
+    .opt-tile { @apply flex cursor-pointer rounded-xl bg-surface-container-low text-on-surface transition-all hover:bg-surface-container; }
+    .opt-input:checked + .opt-tile { @apply bg-primary-container text-on-primary shadow-sm; }
+    .opt-input:checked + .opt-tile .opt-muted { @apply text-on-primary-container; }
+    .opt-input:checked + .opt-tile .opt-price { @apply text-secondary-container; }
+    .opt-input:checked + .opt-tile .opt-icon { @apply text-secondary-container; }
+    .opt-input:focus-visible + .opt-tile { @apply ring-2 ring-secondary ring-offset-2; }
+
+    /* Opción tipo lista (leche, extras): resalta con fondo claro en vez de oscuro */
+    .opt-row { @apply flex cursor-pointer items-center justify-between gap-3 rounded-xl bg-surface-container-low p-3 transition-all hover:bg-surface-container; }
+    .opt-input:checked + .opt-row { @apply bg-surface-container shadow-[0_2px_12px_rgba(61,39,29,0.10)] ring-2 ring-primary-container; }
+    .opt-input:focus-visible + .opt-row { @apply ring-2 ring-secondary; }
+    .opt-input:checked + .opt-row .opt-dot { @apply bg-primary-container; }
+    .opt-input:checked + .opt-row .opt-dot::after { content: ""; @apply h-2 w-2 rounded-full bg-on-primary; }
+    .opt-dot { @apply flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-container-high; }
+    .opt-check .opt-dot { @apply rounded; }
+    .opt-input:checked + .opt-row.opt-check .opt-dot::after { content: "✓"; @apply h-auto w-auto rounded-none bg-transparent text-[12px] font-bold leading-none text-on-primary; }
+
+    /* Iconos Material Symbols */
+    .material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24; }
+    .fill-1 { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24 !important; }
+  }
+</style>

@@ -1,0 +1,256 @@
+{% extends "layouts/customer.html" %}
+{% from "partials/ui.html" import csrf, product_image, favorite_button, product_card %}
+{% set nav_active = 'menu' %}
+{% set page_label = 'Detalle' %}
+{% block title %}{{ product.name }} · {{ cafe.name }}{% endblock %}
+
+{% block content %}
+{% set size_icons = ['text-[24px]', 'text-[28px]', 'text-[32px]'] %}
+<div class="mx-auto w-full max-w-[1140px] px-margin py-space-md lg:px-gutter">
+
+  {# Migas de pan y volver #}
+  <nav class="mb-space-lg flex items-center justify-between gap-space-sm" aria-label="Ruta">
+    <ol class="hidden flex-wrap items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant lg:flex">
+      <li class="flex items-center gap-space-xs"><a href="{{ url_for('menu.index') }}" class="hover:text-secondary">Menú</a><span class="material-symbols-outlined text-[14px]" aria-hidden="true">chevron_right</span></li>
+      <li class="flex items-center gap-space-xs"><a href="{{ url_for('menu.index', cat=product.category.slug) }}" class="hover:text-secondary">{{ product.category.name }}</a><span class="material-symbols-outlined text-[14px]" aria-hidden="true">chevron_right</span></li>
+      <li class="max-w-[260px] truncate font-semibold text-primary-container">{{ product.name }}</li>
+    </ol>
+    <a href="{{ url_for('menu.index') }}" class="inline-flex items-center gap-space-xs rounded-full bg-surface-container px-space-sm py-space-xs font-label-md text-label-md font-semibold text-secondary transition-colors hover:bg-surface-container-high hover:text-primary-container">
+      <span class="material-symbols-outlined text-[18px]" aria-hidden="true">arrow_back</span>Volver al menú
+    </a>
+  </nav>
+
+  <div class="mb-space-xl grid grid-cols-1 items-start gap-space-lg lg:grid-cols-12 lg:gap-space-xl">
+      {# ---------- Columna izquierda: imagen y ficha ---------- #}
+      <div class="contents lg:col-span-5 lg:top-24 lg:sticky lg:flex lg:flex-col lg:gap-space-lg">
+        <div class="relative order-1 aspect-[4/3] w-full overflow-hidden rounded-xl bg-surface-container shadow-[0_4px_20px_-4px_rgba(61,39,29,0.10)] lg:order-none lg:aspect-[4/5]">
+          {{ product_image(product, 'h-full w-full object-cover') }}
+          <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/40 via-transparent to-transparent"></div>
+          <div class="absolute left-space-md top-space-md flex flex-col items-start gap-space-xs">
+            {% if product.badge %}<span class="flex items-center gap-1 rounded-full bg-primary/80 px-2.5 py-1 font-label-sm text-label-sm font-semibold text-surface shadow-sm backdrop-blur-md"><span class="material-symbols-outlined text-[13px] text-secondary-container" aria-hidden="true">local_fire_department</span>{{ product.badge }}</span>{% endif %}
+            {% if product.origin %}<span class="rounded-full bg-surface/90 px-2.5 py-1 font-label-sm text-label-sm text-primary shadow-sm backdrop-blur-md">{{ product.origin }}</span>{% endif %}
+          </div>
+          {{ favorite_button(product, favorite_ids, 'absolute right-space-md top-space-md h-10 w-10 shadow-md') }}
+          <div class="absolute bottom-space-md left-space-md flex items-center gap-1 rounded-full bg-surface/90 px-2.5 py-1 font-label-sm text-label-sm font-medium text-primary shadow-sm backdrop-blur-md">
+            <span class="material-symbols-outlined text-[14px] text-secondary" aria-hidden="true">timer</span>{{ product.prep_minutes }} min de elaboración
+          </div>
+        </div>
+
+        {% if product.origin or product.tasting_note_list or product.calories or product.caffeine_mg %}
+        <div class="order-3 rounded-xl bg-surface-container-lowest p-space-lg shadow-sm lg:order-none">
+          <div class="mb-space-md flex items-center gap-space-xs">
+            <span class="material-symbols-outlined text-[22px] text-secondary" aria-hidden="true">local_cafe</span>
+            <h2 class="font-headline-sm text-headline-sm text-primary-container">Ficha del Barista</h2>
+          </div>
+          {% if product.origin %}
+            <div class="mb-space-md rounded-lg bg-surface-container-low p-space-sm">
+              <span class="block font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Origen</span>
+              <span class="font-label-md text-label-md font-semibold text-primary-container">{{ product.origin }}</span>
+            </div>
+          {% endif %}
+          {% if product.tasting_note_list %}
+            <div class="mb-space-md">
+              <span class="mb-space-xs block font-label-sm text-label-sm font-semibold uppercase tracking-wider text-on-surface-variant">Notas de cata</span>
+              <div class="flex flex-wrap gap-space-xs">
+                {% for note in product.tasting_note_list %}<span class="rounded-full bg-secondary-container/30 px-space-sm py-1 font-label-sm text-label-sm font-medium text-on-secondary-container">{{ note }}</span>{% endfor %}
+              </div>
+            </div>
+          {% endif %}
+          {% if product.calories or product.caffeine_mg %}
+            <div class="flex items-center justify-between font-body-sm text-body-sm text-on-surface-variant">
+              {% if product.caffeine_mg %}<span class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-[16px] text-secondary" aria-hidden="true">bolt</span>Cafeína: ~{{ product.caffeine_mg }} mg</span>{% endif %}
+              {% if product.calories %}<span>Calorías base: <strong class="font-semibold text-on-surface">{{ product.calories }} kcal</strong></span>{% endif %}
+            </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% for pairing in pairings %}
+        <div class="order-4 flex items-center justify-between gap-space-md rounded-xl bg-surface-container-low p-space-md shadow-sm lg:order-none">
+          <div class="flex min-w-0 items-center gap-space-md">
+            <div class="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-surface-container">{{ product_image(pairing, 'h-full w-full object-cover') }}</div>
+            <div class="min-w-0">
+              <span class="font-label-sm text-label-sm font-semibold uppercase tracking-wide text-secondary">Maridaje recomendado</span>
+              <h3 class="truncate font-headline-sm text-headline-sm leading-tight text-primary-container">{{ pairing.name }}</h3>
+              <p class="line-clamp-1 font-body-sm text-body-sm text-on-surface-variant">{{ pairing.description }}</p>
+            </div>
+          </div>
+          <form method="post" action="{{ url_for('cart.add') }}" data-ajax-add class="flex-shrink-0">
+            {{ csrf() }}<input type="hidden" name="product_id" value="{{ pairing.id }}"><input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="flex flex-col items-end rounded-lg bg-surface-container-lowest px-space-sm py-space-xs text-primary-container shadow-sm transition-all hover:bg-secondary hover:text-on-secondary active:scale-95">
+              <span class="font-label-md text-label-md font-bold">+ {{ pairing.price_cents|money }}</span><span class="font-label-sm text-label-sm opacity-80">Añadir</span>
+            </button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# ---------- Columna derecha: personalización (formulario de pedido) ---------- #}
+      <form method="post" action="{{ url_for('cart.add') }}" id="product-form" data-base="{{ product.price_cents }}" data-ajax-add class="order-2 flex flex-col gap-space-lg lg:order-none lg:col-span-7">
+        {{ csrf() }}
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <input type="hidden" name="qty" value="1">
+        <div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-sm">
+          <div class="flex items-start justify-between gap-space-md">
+            <div class="min-w-0">
+              {% if product.subtitle %}<span class="font-label-sm text-label-sm font-semibold uppercase tracking-widest text-secondary">{{ product.subtitle }}</span>{% endif %}
+              <h1 class="mt-space-xs font-headline-lg-mobile text-headline-lg-mobile tracking-tight text-primary-container lg:font-headline-xl lg:text-headline-xl">{{ product.name }}</h1>
+            </div>
+            <div class="shrink-0 text-right">
+              <span class="block font-headline-lg-mobile text-headline-lg-mobile font-semibold text-primary lg:font-headline-xl lg:text-headline-xl lg:font-bold" data-unit-price>{{ product.price_cents|money }}</span>
+              {% if product.is_customizable %}<span class="font-body-sm text-body-sm text-on-surface-variant">Precio base {{ product.price_cents|money }}</span>{% endif %}
+            </div>
+          </div>
+          <p class="mt-space-sm font-body-lg text-body-lg leading-relaxed text-on-surface-variant">{{ product.description }}</p>
+          <div class="mt-space-md flex flex-wrap items-center gap-space-xs">
+            {% if product.meta_line %}<span class="flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1.5 font-label-md text-label-md text-on-surface-variant"><span class="material-symbols-outlined text-[15px] text-secondary" aria-hidden="true">{{ product.meta_icon or 'local_cafe' }}</span>{{ product.meta_line }}</span>{% endif %}
+            {% if product.calories %}<span class="flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1.5 font-label-md text-label-md text-on-surface-variant"><span class="material-symbols-outlined text-[15px] text-secondary" aria-hidden="true">vital_signs</span>{{ product.calories }} kcal</span>{% endif %}
+            {% for tag in product.tag_list if tag == 'vegan' %}<span class="flex items-center gap-1.5 rounded-full bg-tertiary-fixed px-3 py-1.5 font-label-md text-label-md text-on-tertiary-fixed"><span class="material-symbols-outlined text-[15px]" aria-hidden="true">eco</span>Opción vegana</span>{% endfor %}
+          </div>
+        </div>
+
+        {% if groups %}
+        <div class="flex items-center justify-between px-1">
+          <h2 class="font-headline-sm text-headline-sm text-primary">Personaliza tu Ritual</h2>
+          <span class="font-label-sm text-label-sm text-on-surface-variant">Hecho a tu medida</span>
+        </div>
+        {% endif %}
+
+        {% for key, label, mods in groups %}
+        <div role="group" aria-labelledby="group-{{ key }}" class="min-w-0 rounded-xl bg-surface-container-lowest p-space-lg shadow-sm">
+          <div class="mb-space-sm flex flex-wrap items-center justify-between gap-x-space-md gap-y-1">
+            <h3 id="group-{{ key }}" class="flex items-center gap-space-xs font-headline-sm text-headline-sm text-primary">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-container font-label-sm text-[12px] font-bold text-on-primary">{{ loop.index }}</span>{{ label }}
+            </h3>
+            <span class="min-w-0 font-label-sm text-label-sm font-medium text-secondary" data-group-label="{{ key }}"></span>
+          </div>
+
+          {% if key == 'size' %}
+            <div class="grid grid-cols-3 gap-space-sm" role="radiogroup">
+              {% for m in mods %}
+              <label class="relative block">
+                <input type="radio" class="opt-input" name="size" value="{{ m.id }}" data-group="size" data-delta="{{ m.price_delta_cents }}" data-label="{{ m.name }} {{ m.description.split(' / ')[0] if m.description }}" {{ 'checked' if m.is_default }}>
+                <div class="opt-tile flex-col items-center justify-center p-space-md text-center">
+                  {% if m.badge %}<span class="absolute -top-2 rounded-full bg-secondary-container px-2 py-0.5 font-label-sm text-[10px] font-bold text-on-secondary-container">{{ m.badge }}</span>{% endif %}
+                  <span class="material-symbols-outlined opt-icon mb-space-xs text-on-surface-variant {{ size_icons[loop.index0] if loop.index0 < 3 else size_icons[2] }}" aria-hidden="true">{{ m.icon or 'local_cafe' }}</span>
+                  <span class="font-label-md text-label-md font-bold">{{ m.name }}</span>
+                  <span class="opt-muted font-body-sm text-body-sm text-on-surface-variant">{{ m.description }}</span>
+                  <span class="opt-price mt-space-xs font-label-sm text-label-sm font-semibold text-secondary">{{ (m.price_delta_cents|money(true)) if m.price_delta_cents else 'Base' }}</span>
+                </div>
+              </label>
+              {% endfor %}
+            </div>
+
+          {% elif key == 'temperature' or key == 'sweetness' %}
+            <div class="grid gap-space-xs {{ 'grid-cols-2' if key == 'temperature' else 'grid-cols-2 sm:grid-cols-4' }}" role="radiogroup">
+              {% for m in mods %}
+              <label class="block">
+                <input type="radio" class="opt-input" name="{{ key }}" value="{{ m.id }}" data-group="{{ key }}" data-delta="{{ m.price_delta_cents }}" data-label="{{ m.name }}" {{ 'checked' if m.is_default }}>
+                <div class="opt-tile items-center {{ 'gap-space-sm px-space-md py-space-sm' if key == 'temperature' else 'flex-col justify-center px-space-xs py-space-sm text-center' }}">
+                  {% if key == 'temperature' %}<span class="material-symbols-outlined opt-icon text-[22px] text-on-surface-variant" aria-hidden="true">{{ m.icon }}</span>{% endif %}
+                  <span class="{{ 'text-left' if key == 'temperature' }}">
+                    <span class="block font-label-md text-label-md font-bold">{{ m.name }}</span>
+                    {% if m.description %}<span class="opt-muted block text-[10px] font-normal text-on-surface-variant {{ 'sm:text-body-sm' if key == 'temperature' }}">{{ m.description }}</span>{% endif %}
+                  </span>
+                </div>
+              </label>
+              {% endfor %}
+            </div>
+
+          {% elif key == 'milk' %}
+            <div class="flex flex-col gap-2" role="radiogroup">
+              {% for m in mods %}
+              <label class="block">
+                <input type="radio" class="opt-input" name="milk" value="{{ m.id }}" data-group="milk" data-delta="{{ m.price_delta_cents }}" data-label="{{ m.name }}" {{ 'checked' if m.is_default }}>
+                <div class="opt-row">
+                  <div class="flex min-w-0 items-center gap-3">
+                    <span class="opt-dot" aria-hidden="true"></span>
+                    <span class="material-symbols-outlined text-[20px] text-secondary" aria-hidden="true">{{ m.icon or 'grocery' }}</span>
+                    <span class="min-w-0">
+                      <span class="flex flex-wrap items-center gap-2"><span class="font-label-lg text-label-lg font-semibold text-primary">{{ m.name }}</span>{% if m.badge %}<span class="rounded bg-secondary-fixed px-1.5 py-0.5 font-label-sm text-[10px] font-bold uppercase text-on-secondary-fixed">{{ m.badge }}</span>{% endif %}</span>
+                      <span class="block truncate font-body-sm text-body-sm text-on-surface-variant">{{ m.description }}</span>
+                    </span>
+                  </div>
+                  <span class="shrink-0 font-label-md text-label-md font-semibold {{ 'text-secondary' if m.price_delta_cents else 'text-on-surface-variant' }}">{{ (m.price_delta_cents|money(true)) if m.price_delta_cents else 'Incluido' }}</span>
+                </div>
+              </label>
+              {% endfor %}
+            </div>
+
+          {% elif key == 'extra' %}
+            <div class="flex flex-col gap-2">
+              {% for m in mods %}
+              <label class="block">
+                <input type="checkbox" class="opt-input" name="extras" value="{{ m.id }}" data-group="extra" data-delta="{{ m.price_delta_cents }}" data-label="{{ m.name }}">
+                <div class="opt-row opt-check">
+                  <div class="flex min-w-0 items-center gap-3">
+                    <span class="opt-dot" aria-hidden="true"></span>
+                    <span class="min-w-0"><span class="block font-label-lg text-label-lg font-medium text-primary">{{ m.name }}</span><span class="block truncate font-body-sm text-body-sm text-on-surface-variant">{{ m.description }}</span></span>
+                  </div>
+                  <span class="shrink-0 font-label-md text-label-md font-semibold {{ 'text-secondary' if m.price_delta_cents else 'text-on-surface-variant' }}">{{ (m.price_delta_cents|money(true)) if m.price_delta_cents else 'Gratis' }}</span>
+                </div>
+              </label>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="rounded-xl bg-surface-container-lowest p-space-lg shadow-sm">
+          <label for="barista-notes" class="mb-space-xs flex items-center gap-1.5 font-label-lg text-label-lg font-semibold text-primary">
+            <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">edit_note</span>Nota para el Barista
+          </label>
+          <textarea id="barista-notes" name="notes" rows="2" maxlength="160" placeholder="Ej: Temperatura extra caliente, poco caramelo en el borde..." class="field-soft resize-none"></textarea>
+          <div class="mt-space-xs flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant"><span>Cuidamos cada detalle de tu ritual</span><span data-notes-counter>0 / 160</span></div>
+        </div>
+
+        <div class="flex items-center gap-space-md rounded-xl bg-surface-container-low p-3.5">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary-fixed text-on-secondary-fixed"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">timer</span></div>
+          <div class="flex flex-col">
+            <span class="font-label-md text-label-md font-semibold text-primary">Elaboración en vivo al momento</span>
+            <span class="font-body-sm text-body-sm text-on-surface-variant">Tiempo estimado en barra: {{ wait[0] }} a {{ wait[1] }} minutos</span>
+          </div>
+        </div>
+
+        {# Barra de acción #}
+        <div class="sticky bottom-20 z-30 flex flex-col items-center justify-between gap-space-md rounded-xl bg-surface-bright/95 p-space-md shadow-xl backdrop-blur-xl sm:flex-row lg:bottom-6">
+          <div class="flex items-center gap-space-xs self-stretch rounded-xl bg-surface-container p-1 sm:self-auto">
+            <button type="button" data-qty-step="-1" aria-label="Disminuir cantidad" class="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-lowest text-primary-container transition-all hover:bg-surface-container-high active:scale-90"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">remove</span></button>
+            <span class="w-10 select-none text-center font-headline-sm text-headline-sm font-bold text-primary-container" data-qty-display aria-live="polite">1</span>
+            <button type="button" data-qty-step="1" aria-label="Aumentar cantidad" class="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-lowest text-primary-container transition-all hover:bg-surface-container-high active:scale-90"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">add</span></button>
+          </div>
+          <div class="flex w-full flex-1 flex-col items-stretch gap-space-sm sm:w-auto sm:flex-row sm:items-center">
+            <button type="submit" class="group flex flex-1 items-center justify-center gap-space-sm rounded-xl bg-primary-container px-space-lg py-space-md text-on-primary shadow-md transition-all hover:bg-primary active:scale-[0.98]">
+              <span class="material-symbols-outlined text-[20px] text-secondary-container transition-transform group-hover:scale-110" aria-hidden="true">local_mall</span>
+              <span class="font-label-lg text-label-lg font-bold">Añadir al Carrito</span>
+              <span class="h-1 w-1 rounded-full bg-on-primary/40"></span>
+              <span class="font-label-lg text-label-lg font-bold text-secondary-container" data-total-price>{{ product.price_cents|money }}</span>
+            </button>
+            <button type="submit" name="go" value="cart" data-no-ajax class="flex items-center justify-center gap-space-xs rounded-xl bg-surface-container-low px-space-md py-space-md font-label-md text-label-md font-semibold text-primary-container transition-all hover:bg-surface-container active:scale-[0.98]">
+              <span class="material-symbols-outlined text-[18px] text-secondary" aria-hidden="true">shopping_bag</span>Pedir ahora
+            </button>
+          </div>
+        </div>
+        <div class="flex items-center justify-center gap-space-xs text-center font-label-sm text-label-sm text-on-surface-variant">
+          <span class="material-symbols-outlined text-[16px] text-secondary" aria-hidden="true">stars</span>
+          <span>Esta preparación acumula <strong class="font-bold text-secondary" data-beans>+{{ product.beans }} Granos</strong> Moka Club</span>
+        </div>
+      </form>
+  </div>
+
+  {% if related %}
+  <section class="pt-space-lg" aria-labelledby="related-title">
+    <div class="mb-space-lg">
+      <span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-secondary">Carta de Especialidad</span>
+      <h2 id="related-title" class="font-headline-lg-mobile text-headline-lg-mobile text-primary-container lg:font-headline-lg lg:text-headline-lg">Otros Rituales que te pueden Gustar</h2>
+    </div>
+    <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-space-lg">
+      {% for p in related %}{{ product_card(p, favorite_ids) }}{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/product_detail.js') }}"></script>{% endblock %}

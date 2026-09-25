@@ -1,0 +1,186 @@
+{% extends "layouts/admin.html" %}
+{% from "partials/ui.html" import csrf, pagination %}
+{% set admin_active = 'cartera' %}
+{% block title %}Cartera · Panel {{ cafe.short_name }}{% endblock %}
+
+{% block content %}
+{% set next_url = request.full_path.rstrip('?') %}
+{% set tone = {'ok': 'bg-tertiary-fixed text-on-tertiary-fixed', 'bad': 'bg-error-container text-on-error-container', 'warn': 'bg-secondary-fixed text-on-secondary-fixed', 'neutral': 'bg-surface-container text-on-surface-variant'} %}
+{% set dot = {'ok': 'bg-tertiary', 'bad': 'bg-error', 'warn': 'bg-secondary', 'neutral': 'bg-outline'} %}
+<div class="flex flex-col gap-8">
+
+  <div class="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
+    <div class="flex flex-col gap-1.5">
+      <div class="flex items-center gap-2"><span class="inline-flex items-center rounded-full bg-secondary-fixed px-2.5 py-0.5 font-label-sm text-label-sm text-on-secondary-fixed">Control financiero</span><span class="font-label-sm text-label-sm uppercase tracking-widest text-on-surface-variant">• Periodo: {{ periods[period] }}</span></div>
+      <h1 class="font-headline-lg-mobile text-headline-lg-mobile tracking-tight text-primary lg:font-headline-xl lg:text-headline-xl">Cartera: Invertido, Recuperado y Ganancia</h1>
+      <p class="max-w-3xl font-body-md text-body-md text-on-surface-variant">Ajuste de cuentas de la cafetería: lo que gastas en inventario, lo que recuperas con las ventas (ya sin comisiones ni reembolsos) y lo que realmente ganas.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="flex items-center rounded-xl bg-surface-container-high p-1 shadow-inner">
+        {% for key, label in periods.items() %}
+          <a href="{{ url_for('admin_finance.index', periodo=key, metodo=method, tipo=concept) }}" class="rounded-lg px-3.5 py-1.5 font-label-md text-label-md transition-all {{ 'bg-surface-container-lowest text-primary shadow-sm' if period == key else 'text-on-surface-variant hover:text-on-surface' }}" {% if period == key %}aria-current="true"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </div>
+      <a href="{{ url_for('admin_finance.export', periodo=period, metodo=method, tipo=concept) }}" class="btn-primary shadow-md shadow-primary/10"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">file_download</span>Exportar CSV</a>
+    </div>
+  </div>
+
+  {# KPIs del período #}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div class="group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-surface-container-lowest p-5 shadow-[0_4px_16px_-2px_rgba(61,39,29,0.04)]">
+      <div class="pointer-events-none absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-secondary-fixed/30 transition-transform group-hover:scale-110"></div>
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Recuperado (ventas netas)</span><div class="flex h-8 w-8 items-center justify-center rounded-full bg-secondary-fixed text-on-secondary-fixed"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">account_balance_wallet</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold tracking-tight text-primary">{{ summary.recovered|money }}</span><span class="mt-1 font-body-sm text-body-sm text-on-surface-variant">{{ summary.sales_count }} venta{{ 's' if summary.sales_count != 1 }} · comisiones {{ summary.fees|money }}{% if summary.refunds %} · reembolsos {{ summary.refunds|money }}{% endif %}</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-2xl bg-surface-container-lowest p-5 shadow-[0_4px_16px_-2px_rgba(61,39,29,0.04)]">
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Invertido en inventario</span><div class="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container text-secondary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">inventory_2</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold tracking-tight text-primary">{{ summary.invested|money }}</span><span class="mt-1 font-body-sm text-body-sm text-on-surface-variant">{{ summary.purchases_count }} compra{{ 's' if summary.purchases_count != 1 }} de insumos</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-2xl bg-surface-container-lowest p-5 shadow-[0_4px_16px_-2px_rgba(61,39,29,0.04)]">
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Ganancia del periodo</span><div class="flex h-8 w-8 items-center justify-center rounded-full {{ 'bg-tertiary-fixed text-on-tertiary-fixed' if summary.profit >= 0 else 'bg-error-container text-on-error-container' }}"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">{{ 'trending_up' if summary.profit >= 0 else 'trending_down' }}</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold tracking-tight {{ 'text-tertiary' if summary.profit >= 0 else 'text-error' }}">{{ summary.profit|money(true) }}</span><span class="mt-1 font-body-sm text-body-sm text-on-surface-variant">{% if summary.margin_pct is not none %}Margen {{ summary.margin_pct }}% sobre lo recuperado{% else %}Recuperado − invertido{% endif %}{% if summary.adjustments %} · ajustes {{ summary.adjustments|money(true) }}{% endif %}</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-2xl bg-surface-container-lowest p-5 shadow-[0_4px_16px_-2px_rgba(61,39,29,0.04)]">
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Tarjeta / Apple Pay</span><div class="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container text-secondary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">contactless</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold tracking-tight text-primary">{{ summary.tarjeta_net|money }}</span><span class="mt-1 font-body-sm text-body-sm text-on-surface-variant">{{ ((summary.tarjeta_net * 100 / summary.recovered)|round|int) if summary.recovered else 0 }}% de lo recuperado (neto de comisión)</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-2xl bg-surface-container-lowest p-5 shadow-[0_4px_16px_-2px_rgba(61,39,29,0.04)]">
+      <div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Efectivo en barra</span><div class="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container text-secondary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">point_of_sale</span></div></div>
+      <div class="mt-4 flex flex-col"><span class="font-headline-lg text-headline-lg font-bold tracking-tight text-primary">{{ summary.efectivo_net|money }}</span><span class="mt-1 font-body-sm text-body-sm text-on-surface-variant">Caja física auditable</span></div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-8 lg:grid-cols-12">
+    {# Gráfico #}
+    <div class="flex flex-col justify-between rounded-3xl bg-surface-container-lowest p-6 shadow-[0_4px_20px_-3px_rgba(61,39,29,0.05)] lg:col-span-8">
+      <div class="flex flex-col justify-between gap-4 pb-4 sm:flex-row sm:items-center">
+        <div><h2 class="font-headline-sm text-headline-sm text-primary">Ventas por Franja Horaria</h2><p class="font-body-sm text-body-sm text-on-surface-variant">Horas pico de cobro, separadas por método de pago</p></div>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-primary"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Tarjeta</span></div>
+          <div class="flex items-center gap-1.5"><span class="h-3 w-3 rounded-full bg-secondary-container"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Efectivo</span></div>
+        </div>
+      </div>
+      {% set has_sales = chart|selectattr('tarjeta')|list or chart|selectattr('efectivo')|list %}
+      {% if has_sales %}
+      <div class="relative pt-2" role="img" aria-label="Gráfico de barras de ventas por franja horaria">
+        <div class="pointer-events-none absolute inset-x-0 top-2 flex h-48 flex-col justify-between">
+          {% for _ in range(4) %}<div class="border-t border-dashed border-surface-container-high"></div>{% endfor %}
+        </div>
+        <div class="relative flex h-48 items-end justify-between gap-2 border-b border-surface-variant px-1">
+          {% for slot in chart %}
+          <div class="flex h-full flex-1 items-end justify-center gap-1">
+            <div class="w-3 rounded-t bg-primary sm:w-5" style="height: {{ [slot.tarjeta_pct, 3]|max if slot.tarjeta else 0 }}%" title="Tarjeta {{ slot.label }} h: {{ slot.tarjeta|money }}"></div>
+            <div class="w-3 rounded-t bg-secondary-container sm:w-5" style="height: {{ [slot.efectivo_pct, 3]|max if slot.efectivo else 0 }}%" title="Efectivo {{ slot.label }} h: {{ slot.efectivo|money }}"></div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="flex justify-between gap-2 px-1 pt-3 font-label-sm text-label-sm text-on-surface-variant">
+          {% for slot in chart %}<span class="flex-1 text-center">{{ slot.label }}</span>{% endfor %}
+        </div>
+      </div>
+      {% else %}
+        <div class="flex h-48 flex-col items-center justify-center gap-2 text-center"><span class="material-symbols-outlined text-[36px] text-outline" aria-hidden="true">bar_chart</span><p class="font-body-md text-body-md text-on-surface-variant">No hay ventas en este periodo.</p></div>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-col gap-6 lg:col-span-4">
+      {# Ajuste de cuentas (acumulado) #}
+      <div class="flex flex-col gap-4 rounded-3xl bg-surface-container-lowest p-6 shadow-[0_4px_20px_-3px_rgba(61,39,29,0.05)]">
+        <div class="flex items-center justify-between"><h2 class="font-headline-sm text-headline-sm text-primary">Ajuste de Cuentas</h2><span class="rounded-full bg-secondary-fixed px-2.5 py-1 font-label-sm text-label-sm font-semibold text-on-secondary-fixed">Acumulado total</span></div>
+        <div class="flex flex-col gap-2.5">
+          <div class="flex items-center justify-between rounded-xl bg-surface-container-low p-3.5"><div class="flex items-center gap-3"><span class="material-symbols-outlined text-[22px] text-secondary" aria-hidden="true">inventory_2</span><span class="font-label-md text-label-md text-primary">Invertido en inventario</span></div><span class="font-headline-sm text-headline-sm font-semibold text-primary">{{ overall.invested|money }}</span></div>
+          <div class="flex items-center justify-between rounded-xl bg-surface-container-low p-3.5"><div class="flex items-center gap-3"><span class="material-symbols-outlined text-[22px] text-secondary" aria-hidden="true">savings</span><span class="font-label-md text-label-md text-primary">Recuperado en ventas</span></div><span class="font-headline-sm text-headline-sm font-semibold text-secondary">{{ overall.recovered|money }}</span></div>
+          <div class="flex items-center justify-between rounded-xl p-3.5 text-on-primary shadow-lg shadow-primary/10 {{ 'bg-primary' if overall.profit >= 0 else 'bg-error' }}">
+            <div class="flex flex-col"><span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary-container">Ganancia total</span><span class="font-headline-md text-headline-md font-bold text-on-primary">{{ overall.profit|money(true) }}</span></div>
+            <span class="material-symbols-outlined text-[28px] text-secondary-fixed" aria-hidden="true">{{ 'trending_up' if overall.profit >= 0 else 'trending_down' }}</span>
+          </div>
+        </div>
+        <div>
+          {% set pct = overall.recovery_pct %}
+          <div class="mb-1.5 flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant"><span>Inversión recuperada</span><span class="font-bold text-primary">{{ (pct ~ '%') if pct is not none else '—' }}</span></div>
+          <div class="h-2 w-full overflow-hidden rounded-full bg-surface-container-high"><div class="h-full rounded-full {{ 'bg-tertiary-container' if pct and pct >= 100 else 'bg-secondary' }}" style="width: {{ [pct or 0, 100]|min }}%"></div></div>
+          <p class="mt-2 font-body-sm text-body-sm text-on-surface-variant">
+            {% if overall.profit >= 0 %}Ya recuperaste todo lo invertido y llevas ganancia.{% else %}Aún faltan {{ (-overall.profit)|money }} por recuperar.{% endif %}
+            Stock todavía en almacén: <strong class="text-on-surface">{{ stock_value|money }}</strong> (ganancia contando ese stock: <strong class="{{ 'text-tertiary' if overall.profit + stock_value >= 0 else 'text-error' }}">{{ (overall.profit + stock_value)|money(true) }}</strong>).
+          </p>
+        </div>
+        <button type="button" data-open-dialog="dlg-adjust" class="btn-accent w-full !py-3 shadow-md shadow-secondary/15"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">balance</span>Registrar ajuste manual</button>
+      </div>
+
+      {# Arqueo #}
+      <div class="flex flex-col gap-4 rounded-3xl bg-surface-container-lowest p-6 shadow-[0_4px_20px_-3px_rgba(61,39,29,0.05)]">
+        <div class="flex items-center justify-between"><h2 class="font-headline-sm text-headline-sm text-primary">Arqueo de Caja Física</h2><span class="rounded-full bg-secondary-fixed px-2.5 py-1 font-label-sm text-label-sm font-semibold text-on-secondary-fixed">Hoy</span></div>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between rounded-xl bg-surface-container-low p-3.5"><div class="flex flex-col"><span class="font-label-md text-label-md text-primary">Fondo inicial de caja</span><span class="font-body-sm text-body-sm text-on-surface-variant">Configurado en el sistema</span></div><span class="font-headline-sm text-headline-sm font-semibold text-primary">{{ drawer.opening|money }}</span></div>
+          <div class="flex items-center justify-between rounded-xl bg-surface-container-low p-3.5"><div class="flex flex-col"><span class="font-label-md text-label-md text-primary">Cobros en efectivo hoy</span><span class="font-body-sm text-body-sm text-on-surface-variant">Ventas − reembolsos en efectivo</span></div><span class="font-headline-sm text-headline-sm font-semibold text-secondary">{{ drawer.collected|money(true) }}</span></div>
+          <div class="flex items-center justify-between rounded-xl bg-primary p-3.5 text-on-primary shadow-lg shadow-primary/10"><div class="flex flex-col"><span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary-container">Saldo esperado en cajón</span><span class="font-headline-md text-headline-md font-bold text-on-primary">{{ drawer.expected|money }}</span></div><span class="material-symbols-outlined text-[28px] text-secondary-fixed" aria-hidden="true">lock</span></div>
+        </div>
+        <div class="flex items-center justify-between font-body-sm text-body-sm text-on-surface-variant"><span>Por cobrar en barra (pedidos pendientes):</span><a href="{{ url_for('admin_orders.index', estado='pendiente') }}" class="rounded-md bg-secondary-fixed px-2 py-0.5 font-label-md text-label-md text-on-secondary-fixed">{{ pending_amount|money }} · {{ pending_count }}</a></div>
+      </div>
+    </div>
+  </div>
+
+  {# Transacciones #}
+  <div class="flex flex-col gap-6 rounded-3xl bg-surface-container-lowest p-6 shadow-[0_4px_20px_-3px_rgba(61,39,29,0.05)]">
+    <div class="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div><h2 class="font-headline-md text-headline-md text-primary">Movimientos de la Cartera</h2><p class="font-body-sm text-body-sm text-on-surface-variant">Ventas, reembolsos, compras de inventario y ajustes, con su comisión de pasarela</p></div>
+      <form method="get" action="{{ url_for('admin_finance.index') }}" class="flex flex-wrap items-center gap-3">
+        <input type="hidden" name="periodo" value="{{ period }}">
+        <div class="relative"><span class="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant" aria-hidden="true">filter_list</span>
+          <select name="tipo" data-autosubmit aria-label="Filtrar por tipo" class="appearance-none rounded-xl bg-surface-container-low py-2 pl-9 pr-8 font-label-md text-label-md text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary/40"><option value="">Todos los tipos</option>{% for key, label in concepts.items() %}<option value="{{ key }}" {{ 'selected' if concept == key }}>{{ label }}</option>{% endfor %}</select>
+          <span class="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant" aria-hidden="true">expand_more</span></div>
+        <div class="relative">
+          <select name="metodo" data-autosubmit aria-label="Filtrar por método" class="appearance-none rounded-xl bg-surface-container-low py-2 pl-3 pr-8 font-label-md text-label-md text-on-surface focus:outline-none focus:ring-1 focus:ring-secondary/40"><option value="">Todos los métodos</option>{% for key, label in methods.items() %}<option value="{{ key }}" {{ 'selected' if method == key }}>{{ label }}</option>{% endfor %}</select>
+          <span class="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant" aria-hidden="true">expand_more</span></div>
+        {% if method or concept %}<a href="{{ url_for('admin_finance.index', periodo=period) }}" class="font-label-sm text-label-sm text-secondary hover:underline">Limpiar</a>{% endif %}
+      </form>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[920px] border-collapse text-left">
+        <thead><tr class="bg-surface-container-low/70 font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
+          <th class="rounded-l-xl px-4 py-3">ID</th><th class="px-4 py-3">Fecha / Hora</th><th class="px-4 py-3">Concepto</th><th class="px-4 py-3">Cliente / Proveedor</th><th class="px-4 py-3">Método</th><th class="px-4 py-3">Estado</th><th class="px-4 py-3 text-right">Monto</th><th class="px-4 py-3 text-right">Comisión</th><th class="rounded-r-xl px-4 py-3 text-right">Efecto neto</th></tr></thead>
+        <tbody class="divide-y divide-surface-container font-body-sm text-body-sm text-on-surface">
+          {% for e in transactions.items %}
+          {% set label, kind = e.status %}
+          <tr class="transition-colors hover:bg-surface-container-low/40">
+            <td class="px-4 py-3.5 font-mono font-medium text-primary">{{ e.tx_id }}</td>
+            <td class="px-4 py-3.5 text-on-surface-variant">{{ e.created_at|friendly }}</td>
+            <td class="px-4 py-3.5"><span class="block font-medium">{{ e.concept_label }}</span><span class="block text-[11px] text-on-surface-variant">{% if e.order %}<a href="{{ url_for('admin_orders.index', estado='todas', ver=e.order.code) }}" class="font-semibold text-secondary hover:underline">#{{ e.order.code }}</a>{% else %}{{ e.description }}{% endif %}</span></td>
+            <td class="px-4 py-3.5">{{ e.party or '—' }}</td>
+            <td class="px-4 py-3.5">{% if e.method %}<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" aria-hidden="true">{{ 'credit_card' if e.method == 'tarjeta' else 'payments' }}</span>{{ e.method_label }}</span>{% else %}<span class="text-outline">—</span>{% endif %}</td>
+            <td class="px-4 py-3.5"><span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-label-sm text-label-sm font-semibold {{ tone[kind] }}"><span class="h-1.5 w-1.5 rounded-full {{ dot[kind] }}"></span>{{ label }}</span></td>
+            <td class="px-4 py-3.5 text-right font-medium {{ 'text-error' if e.kind == 'egreso' }}">{{ ('-' if e.kind == 'egreso') }}{{ e.amount_cents|money }}</td>
+            <td class="px-4 py-3.5 text-right {{ 'font-medium text-error' if e.fee_cents else 'text-on-surface-variant' }}">{{ ('-' ~ (e.fee_cents|money)) if e.fee_cents else '$0.00' }}</td>
+            <td class="px-4 py-3.5 text-right font-bold {{ 'text-error' if e.net_cents < 0 else 'text-primary' }}">{{ e.net_cents|money(true) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="px-4 py-10 text-center font-body-md text-body-md text-on-surface-variant">No hay movimientos con estos filtros.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="flex flex-col justify-between gap-4 pt-2 sm:flex-row sm:items-center">
+      <span class="font-body-sm text-body-sm text-on-surface-variant">{{ transactions.total }} movimiento{{ 's' if transactions.total != 1 }} en el periodo</span>
+      {{ pagination(transactions, 'admin_finance.index') }}
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg-adjust" class="m-auto w-[min(92vw,30rem)] rounded-2xl bg-surface-container-lowest shadow-2xl">
+  <form method="post" action="{{ url_for('admin_finance.adjustment') }}" class="flex flex-col gap-4 p-6">
+    {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+    <div class="flex items-start justify-between gap-4">
+      <div><h2 class="font-headline-sm text-headline-sm text-primary">Ajuste manual de cuentas</h2><p class="font-body-sm text-body-sm text-on-surface-variant">Para corregir la caja o registrar un ingreso o gasto que no viene de un pedido ni de una compra de insumos.</p></div>
+      <button type="button" data-close-dialog class="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container" aria-label="Cerrar"><span class="material-symbols-outlined text-[20px]">close</span></button>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="field-label" for="adj-kind">Tipo</label><select id="adj-kind" name="kind" class="field"><option value="egreso">Egreso (sale dinero)</option><option value="ingreso">Ingreso (entra dinero)</option></select></div>
+      <div><label class="field-label" for="adj-amount">Importe ($)</label><input id="adj-amount" name="amount" required inputmode="decimal" placeholder="0.00" class="field"></div>
+    </div>
+    <div><label class="field-label" for="adj-method">Método</label><select id="adj-method" name="method" class="field"><option value="efectivo">Efectivo (afecta el arqueo)</option><option value="tarjeta">Tarjeta / banco</option></select></div>
+    <div><label class="field-label" for="adj-desc">Motivo</label><input id="adj-desc" name="description" required minlength="3" maxlength="240" class="field" placeholder="Ej. Faltante de caja, propina, pago de luz..."></div>
+    <div class="flex justify-end gap-2 pt-2"><button type="button" data-close-dialog class="btn-soft">Cancelar</button><button type="submit" class="btn-primary">Registrar ajuste</button></div>
+  </form>
+</dialog>
+{% endblock %}

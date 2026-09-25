@@ -1,0 +1,21 @@
+{# Selector de modo de entrega. Variables: mode, table, next_url, [compact] #}
+{% from "partials/ui.html" import csrf %}
+<form method="post" action="{{ url_for('cart.set_mode') }}" class="flex items-center gap-1.5 rounded-xl bg-surface-container-low p-1.5 shadow-sm" aria-label="Modo de entrega">
+  {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+  <button type="submit" name="mode" value="barra" aria-pressed="{{ 'true' if mode == 'barra' else 'false' }}"
+          class="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 transition-all {{ 'bg-surface-container-lowest text-primary shadow-sm' if mode == 'barra' else 'text-on-surface-variant hover:bg-surface-container' }}">
+    <span class="material-symbols-outlined text-[20px] {{ 'text-secondary' if mode == 'barra' }}" aria-hidden="true">storefront</span>
+    <span class="flex flex-col text-left leading-tight">
+      <span class="font-label-md text-label-md {{ 'font-bold text-primary' if mode == 'barra' else 'font-medium' }}">Retiro en barra</span>
+      <span class="font-label-sm text-label-sm font-medium text-on-surface-variant">Listo en {{ wait[0] }}-{{ wait[1] }} min</span>
+    </span>
+  </button>
+  <button type="submit" name="mode" value="mesa" aria-pressed="{{ 'true' if mode == 'mesa' else 'false' }}"
+          class="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 transition-all {{ 'bg-surface-container-lowest text-primary shadow-sm' if mode == 'mesa' else 'text-on-surface-variant hover:bg-surface-container' }}">
+    <span class="material-symbols-outlined text-[20px] {{ 'text-secondary' if mode == 'mesa' }}" aria-hidden="true">table_restaurant</span>
+    <span class="flex flex-col text-left leading-tight">
+      <span class="font-label-md text-label-md {{ 'font-bold text-primary' if mode == 'mesa' else 'font-medium' }}">Servir en mesa</span>
+      <span class="font-label-sm text-label-sm font-medium text-on-surface-variant">{{ 'Mesa ' ~ table if table else 'Indica tu número' }}</span>
+    </span>
+  </button>
+</form>

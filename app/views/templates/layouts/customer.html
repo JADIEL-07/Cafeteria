@@ -1,0 +1,10 @@
+{% extends "layouts/base.html" %}
+{# Layout del cliente: cabecera de escritorio + cabecera compacta y barra inferior en móvil. #}
+{% block body %}
+  {% include "partials/customer_header.html" %}
+  <main class="min-h-[calc(100vh-20rem)] w-full bg-surface pb-24 pt-16 lg:pb-0 lg:pt-20">
+    {% block content %}{% endblock %}
+  </main>
+  {% include "partials/customer_footer.html" %}
+  {% include "partials/mobile_nav.html" %}
+{% endblock %}

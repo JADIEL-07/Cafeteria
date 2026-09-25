@@ -1,0 +1,220 @@
+{% extends "layouts/admin.html" %}
+{% from "partials/ui.html" import csrf, stage_badge, empty_state, pagination %}
+{% set admin_active = 'pedidos' %}
+{% block title %}Pedidos · Panel {{ cafe.short_name }}{% endblock %}
+{% block body_attrs %}data-poll-url="{{ url_for('admin_orders.signal') }}" data-poll-key="signature" data-poll-value="{{ signature }}"{% endblock %}
+
+{% macro action_form(order, endpoint, label, glyph, next_url, style='btn-primary', confirm=None) %}
+  <form method="post" action="{{ url_for(endpoint, order_id=order.id) }}" {% if confirm %}data-confirm="{{ confirm }}"{% endif %} class="w-full sm:w-auto">
+    {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+    <button type="submit" class="{{ style }} w-full sm:w-auto"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">{{ glyph }}</span>{{ label }}</button>
+  </form>
+{% endmacro %}
+
+{% macro order_card(o, selected, next_url) %}
+  {% set stage = o.stage %}
+  {% set muted = stage in ('cancelled', 'delivered') %}
+  <article id="order-{{ o.code }}" class="relative flex flex-col justify-between gap-4 overflow-hidden rounded-xl bg-surface-container-lowest p-5 shadow-sm transition-all hover:shadow-md {{ 'ring-2 ring-secondary/40' if selected and selected.id == o.id }} {{ 'opacity-75' if muted }}">
+    <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+      <div class="flex items-start gap-3">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl {{ o.stage_info.tile }}"><span class="material-symbols-outlined text-[24px]" aria-hidden="true">{{ o.stage_info.icon }}</span></div>
+        <div class="flex flex-col">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-headline-sm text-headline-sm font-semibold {{ 'text-on-surface-variant line-through' if stage == 'cancelled' else 'text-primary' }}">#{{ o.code }}</span>
+            {{ stage_badge(o) }}
+            <span class="font-body-sm text-body-sm text-on-surface-variant">{{ o.created_at|ago }}</span>
+            {% if o.arrived_at and o.is_open %}<span class="chip bg-secondary-container font-semibold text-on-secondary-container"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">directions_walk</span>Cliente en barra</span>{% endif %}
+          </div>
+          <h3 class="mt-1 font-label-lg text-label-lg text-on-surface">{{ o.customer_name }}</h3>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">{{ o.fulfillment_label }}</p>
+        </div>
+      </div>
+      <div class="flex items-baseline justify-between sm:flex-col sm:items-end sm:justify-start">
+        <span class="font-headline-sm text-headline-sm font-bold {{ 'text-error' if stage == 'pending_payment' else ('text-on-surface-variant line-through' if stage == 'cancelled' else 'text-primary') }}">{{ o.total_cents|money }}</span>
+        <div class="mt-0.5 flex items-center gap-1 font-label-sm text-label-sm {{ 'text-tertiary' if o.payment_status == 'pagado' else 'text-on-surface-variant' }}">
+          <span class="material-symbols-outlined text-[15px]" aria-hidden="true">{{ 'credit_card' if o.payment_method == 'tarjeta' else 'payments' }}</span>
+          <span>{{ o.payment_method_label }}{% if o.payment_status == 'reembolsado' %} · reembolsado{% elif o.payment_status == 'pendiente' and stage != 'cancelled' %} · pendiente{% endif %}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col justify-between gap-2 rounded-xl bg-surface-container-low p-3 sm:flex-row sm:items-center">
+      <div class="flex min-w-0 flex-col">
+        <span class="font-label-md text-label-md font-medium text-primary">{% for i in o.items %}{{ i.qty }}x {{ i.name }}{{ ' + ' if not loop.last }}{% endfor %}</span>
+        {% set extras = [] %}{% for i in o.items %}{% if i.options_text %}{% set _ = extras.append(i.options_text) %}{% endif %}{% endfor %}
+        {% if extras or o.notes %}<span class="truncate font-body-sm text-body-sm italic text-on-surface-variant">{{ extras[0] if extras }}{% if o.notes %}{{ ' • ' if extras }}Nota: {{ o.notes }}{% endif %}</span>{% endif %}
+      </div>
+      <a href="{{ url_for('admin_orders.index', estado=active_filter, ver=o.code, q=query or None, page=board.page if board.page > 1 else None) }}#inspector" class="shrink-0 self-end font-label-sm text-label-sm text-secondary hover:underline sm:self-center">Ver ticket completo</a>
+    </div>
+
+    {% if stage == 'pending_payment' %}
+      <div class="flex flex-col gap-2 rounded-xl bg-surface-container p-3">
+        <div class="flex items-start gap-2 text-error">
+          <span class="material-symbols-outlined mt-0.5 shrink-0 text-[18px]" aria-hidden="true">lock</span>
+          <div class="flex flex-col"><span class="font-label-sm text-label-sm font-bold uppercase tracking-wider">Acción bloqueada por protocolo</span>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">El cliente debe pagar en mostrador antes de que entre a preparación. Confirma el cobro para desbloquear el pedido.</p></div>
+        </div>
+        <div class="flex flex-col items-center justify-end gap-2 pt-2 sm:flex-row">
+          <button type="button" disabled class="btn w-full cursor-not-allowed bg-surface-variant text-on-surface-variant/50 sm:w-auto"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">block</span>Aceptar Pedido (Bloqueado)</button>
+          {{ action_form(o, 'admin_orders.confirm_payment', 'Validar Pago Recibido en Barra', 'point_of_sale', next_url, 'btn-accent', 'Confirmas que recibiste ' ~ (o.total_cents|money) ~ ' en efectivo para ' ~ o.code ~ '?') }}
+        </div>
+      </div>
+    {% elif stage == 'paid' %}
+      <div class="flex flex-col items-center justify-between gap-3 pt-1 sm:flex-row">
+        <div class="flex items-center gap-2 font-label-sm text-label-sm text-tertiary"><span class="h-2 w-2 rounded-full bg-tertiary"></span>Pago confirmado{% if o.transaction_ref %} ({{ o.transaction_ref }}){% endif %}: aprobado para preparación</div>
+        <div class="flex w-full items-center gap-2 sm:w-auto">
+          {{ action_form(o, 'admin_orders.accept', 'Aceptar Pedido e Iniciar Elaboración', 'soup_kitchen', next_url) }}
+        </div>
+      </div>
+    {% elif stage == 'in_bar' %}
+      <div class="flex flex-col items-center justify-between gap-3 pt-1 sm:flex-row">
+        <div class="flex items-center gap-2 font-label-sm text-label-sm text-secondary"><span class="h-2 w-2 animate-pulse rounded-full bg-secondary"></span>En preparación desde {{ o.accepted_at|friendly }}{% if o.accepted_by %} · {{ o.accepted_by.first_name }}{% endif %}</div>
+        {{ action_form(o, 'admin_orders.ready', 'Marcar como Listo', 'notifications_active', next_url) }}
+      </div>
+    {% elif stage == 'ready' %}
+      <div class="flex flex-col items-center justify-between gap-3 pt-1 sm:flex-row">
+        <div class="flex items-center gap-2 font-label-sm text-label-sm text-secondary"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">pin</span>PIN de retiro del cliente: <strong class="font-mono text-primary">{{ o.pickup_pin }}</strong></div>
+        {{ action_form(o, 'admin_orders.deliver', 'Entregar al Cliente', 'check_circle', next_url) }}
+      </div>
+    {% elif stage == 'cancelled' %}
+      <div class="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">info</span>{{ o.cancel_reason or 'Pedido cancelado.' }}{% if o.payment_status == 'reembolsado' %} Reembolso emitido.{% endif %}</div>
+    {% endif %}
+
+    {% if o.can_cancel %}
+      <form method="post" action="{{ url_for('admin_orders.cancel', order_id=o.id) }}" data-confirm="¿Cancelar {{ o.code }}?{{ ' Se reembolsará ' ~ (o.total_cents|money) ~ ' al cliente.' if o.payment_status == 'pagado' }}" class="-mt-1 self-end">
+        {{ csrf() }}<input type="hidden" name="next" value="{{ next_url }}">
+        <button type="submit" class="flex items-center gap-1 font-label-sm text-label-sm text-outline transition-colors hover:text-error"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">close</span>Cancelar pedido{{ ' y reembolsar' if o.payment_status == 'pagado' }}</button>
+      </form>
+    {% endif %}
+  </article>
+{% endmacro %}
+
+{% block content %}
+{% set next_url = request.full_path.rstrip('?') %}
+<div class="flex flex-col gap-6">
+
+  <div class="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+    <div>
+      <div class="mb-1 flex items-center gap-2">
+        <span class="font-label-sm text-label-sm uppercase tracking-wider text-secondary">Control operativo en vivo</span>
+        <span class="h-1.5 w-1.5 rounded-full bg-secondary"></span>
+        <span class="font-label-sm text-label-sm font-medium text-on-surface-variant">{{ cafe.location_name }}</span>
+      </div>
+      <h1 class="font-headline-lg-mobile text-headline-lg-mobile tracking-tight text-primary lg:font-headline-lg lg:text-headline-lg">Gestión y Despacho de Pedidos</h1>
+    </div>
+    <div class="flex items-center gap-2 self-start rounded-xl bg-surface-container-low px-3 py-2 text-on-surface-variant shadow-sm xl:self-auto">
+      <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-tertiary-container"></span>
+      <span class="font-label-sm text-label-sm">Se actualiza solo al llegar un pedido nuevo</span>
+    </div>
+  </div>
+
+  {# Regla de negocio #}
+  <div class="relative flex flex-col items-start justify-between gap-4 overflow-hidden rounded-xl bg-primary-container p-4 text-on-primary shadow-md md:flex-row md:items-center">
+    <div class="pointer-events-none absolute -bottom-8 -right-8 h-40 w-40 rounded-full bg-white/5"></div>
+    <div class="relative z-10 flex items-start gap-3.5 md:items-center">
+      <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary-fixed text-on-secondary-fixed shadow-sm"><span class="material-symbols-outlined text-[22px]" aria-hidden="true">verified</span></div>
+      <div class="flex flex-col">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-label-md text-label-md font-bold uppercase tracking-wide text-secondary-fixed">Regla estricta de barra</span>
+          <span class="rounded-full bg-error px-2 py-0.5 font-label-sm text-label-sm uppercase text-on-error">Bloqueo activo</span>
+        </div>
+        <p class="mt-0.5 font-body-sm text-body-sm text-on-primary-container">Sólo los pedidos con estado <strong class="font-semibold text-on-primary">"PAGO CONFIRMADO"</strong> pueden aceptarse para entrar a preparación. Un pedido sin cobrar nunca descuenta inventario.</p>
+      </div>
+    </div>
+    <div class="relative z-10 flex shrink-0 items-center gap-2 rounded-lg bg-black/20 px-3 py-1.5 font-label-sm text-label-sm text-secondary-fixed"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">lock_clock</span>Anti-merma automático</div>
+  </div>
+
+  {# KPIs #}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+      <div class="mb-3 flex items-center justify-between"><span class="font-label-sm text-label-sm font-medium text-on-surface-variant">Pendientes de Pago</span><div class="flex h-7 w-7 items-center justify-center rounded-lg bg-error-container text-on-error-container"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">credit_card_off</span></div></div>
+      <div class="flex items-baseline gap-2"><span class="font-headline-lg text-headline-lg {{ 'text-error' if kpis.pending_count else 'text-primary' }}">{{ kpis.pending_count }}</span><span class="font-body-sm text-body-sm text-on-surface-variant">por cobrar · {{ kpis.pending_amount|money }}</span></div>
+      <div class="mt-3 flex items-center gap-1.5 border-t border-surface-container pt-2.5 font-label-sm text-label-sm {{ 'text-error' if kpis.pending_count else 'text-on-surface-variant' }}"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">{{ 'warning' if kpis.pending_count else 'check' }}</span><span>{{ 'Acceso a preparación bloqueado' if kpis.pending_count else 'Nada pendiente de cobro' }}</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+      <div class="mb-3 flex items-center justify-between"><span class="font-label-sm text-label-sm font-medium text-on-surface-variant">Listos para Aceptar</span><div class="flex h-7 w-7 items-center justify-center rounded-lg bg-tertiary-fixed text-on-tertiary-fixed"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">payments</span></div></div>
+      <div class="flex items-baseline gap-2"><span class="font-headline-lg text-headline-lg text-primary">{{ kpis.ready_to_accept }}</span><span class="font-body-sm text-body-sm text-on-surface-variant">órdenes pagadas</span></div>
+      <div class="mt-3 flex items-center gap-1.5 border-t border-surface-container pt-2.5 font-label-sm text-label-sm text-secondary"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">touch_app</span><span>Esperan tu confirmación</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+      <div class="mb-3 flex items-center justify-between"><span class="font-label-sm text-label-sm font-medium text-on-surface-variant">En Barra</span><div class="flex h-7 w-7 items-center justify-center rounded-lg bg-secondary-fixed text-on-secondary-fixed"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">coffee_maker</span></div></div>
+      <div class="flex items-baseline gap-2"><span class="font-headline-lg text-headline-lg text-primary">{{ kpis.in_bar }}</span><span class="font-body-sm text-body-sm text-on-surface-variant">comandas en marcha</span></div>
+      <div class="mt-3 flex items-center gap-1.5 border-t border-surface-container pt-2.5 font-label-sm text-label-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">timer</span><span>{{ ('Tiempo medio hoy: ' ~ kpis.avg_prep ~ ' min') if kpis.avg_prep else 'Aún sin datos de tiempo hoy' }}</span></div>
+    </div>
+    <div class="flex flex-col justify-between rounded-xl bg-surface-container-lowest p-4 shadow-sm">
+      <div class="mb-3 flex items-center justify-between"><span class="font-label-sm text-label-sm font-medium text-on-surface-variant">Ventas de Hoy</span><div class="flex h-7 w-7 items-center justify-center rounded-lg bg-surface-container text-secondary"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">point_of_sale</span></div></div>
+      <div class="flex items-baseline gap-2"><span class="font-headline-lg text-headline-lg font-bold text-secondary">{{ kpis.sales_today|money }}</span></div>
+      <div class="mt-3 flex items-center gap-1.5 border-t border-surface-container pt-2.5 font-label-sm text-label-sm text-on-surface-variant"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">donut_large</span><span>{{ kpis.tickets_today }} ticket{{ 's' if kpis.tickets_today != 1 }} cobrado{{ 's' if kpis.tickets_today != 1 }} hoy</span></div>
+    </div>
+  </div>
+
+  {# Filtros #}
+  <div class="flex flex-col items-stretch justify-between gap-3 rounded-xl bg-surface-container-low p-2 lg:flex-row lg:items-center">
+    <div class="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0" aria-label="Filtrar pedidos">
+      {% for key, label in filters.items() %}
+        <a href="{{ url_for('admin_orders.index', estado=key, q=query or None) }}" class="shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 font-label-sm text-label-sm transition-all {{ 'bg-primary text-on-primary shadow-sm' if active_filter == key else 'bg-surface-container text-on-surface-variant hover:text-on-surface' }}">{{ label }} ({{ counts[key] }})</a>
+      {% endfor %}
+    </div>
+    {% if query %}<a href="{{ url_for('admin_orders.index', estado=active_filter) }}" class="flex shrink-0 items-center gap-1 self-end font-label-sm text-label-sm text-secondary hover:underline lg:self-auto"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">close</span>Quitar búsqueda «{{ query }}»</a>{% endif %}
+  </div>
+
+  {# Tablero + inspector #}
+  <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+    <div class="flex flex-col gap-4 lg:col-span-8">
+      {% for o in board.items %}{{ order_card(o, selected, next_url) }}{% else %}
+        {{ empty_state('inbox', 'No hay pedidos en esta vista', 'Cuando lleguen pedidos nuevos aparecerán aquí automáticamente.') }}
+      {% endfor %}
+      {{ pagination(board, 'admin_orders.index') }}
+    </div>
+
+    <aside id="inspector" class="sticky top-24 flex flex-col gap-5 rounded-xl bg-surface-container-lowest p-5 shadow-sm lg:col-span-4" aria-label="Inspección de ticket">
+      {% if selected %}
+        <div class="flex items-center justify-between border-b border-surface-container pb-3">
+          <div class="flex items-center gap-2"><span class="material-symbols-outlined text-[20px] text-secondary" aria-hidden="true">receipt</span><span class="font-headline-sm text-headline-sm text-primary">Inspección de Ticket</span></div>
+          {{ stage_badge(selected) }}
+        </div>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center justify-between"><span class="font-headline-sm text-headline-sm text-primary">#{{ selected.code }}</span><span class="font-headline-sm text-headline-sm font-bold text-secondary">{{ selected.total_cents|money }}</span></div>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Cliente: {{ selected.customer_name }} • {{ selected.fulfillment_label }}</p>
+          <p class="font-body-sm text-body-sm text-on-surface-variant">Pago: {{ selected.payment_method_label }} · PIN <span class="font-mono font-semibold text-primary">{{ selected.pickup_pin }}</span></p>
+        </div>
+        {% if selected.notes %}
+          <div class="rounded-xl bg-secondary-fixed/50 p-3"><span class="font-label-sm text-label-sm font-bold uppercase tracking-wider text-on-secondary-fixed">Nota del cliente</span><p class="mt-0.5 font-body-sm text-body-sm text-on-secondary-fixed">{{ selected.notes }}</p></div>
+        {% endif %}
+        <div class="flex flex-col gap-2">
+          <span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-on-surface-variant">Desglose de orden</span>
+          <div class="space-y-2 font-body-sm text-body-sm text-on-surface">
+            {% for i in selected.items %}
+              <div class="flex items-start justify-between gap-2">
+                <span class="min-w-0"><span class="font-medium">{{ i.qty }}x {{ i.name }}</span>{% if i.options_text %}<span class="block truncate text-[11px] text-on-surface-variant">{{ i.options_text }}</span>{% endif %}{% if i.notes %}<span class="block text-[11px] italic text-on-surface-variant">“{{ i.notes }}”</span>{% endif %}</span>
+                <span class="shrink-0 font-medium text-primary">{{ i.line_total_cents|money }}</span>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="space-y-1 border-t border-surface-container pt-2 font-body-sm text-body-sm text-on-surface-variant">
+            <div class="flex justify-between"><span>Subtotal de productos</span><span>{{ selected.subtotal_cents|money }}</span></div>
+            {% if selected.discount_cents %}<div class="flex justify-between"><span>Cupón {{ selected.coupon_code }}</span><span>-{{ selected.discount_cents|money }}</span></div>{% endif %}
+            <div class="flex justify-between"><span>Impuestos</span><span>{{ selected.tax_cents|money }}</span></div>
+            {% if selected.fee_cents %}<div class="flex justify-between"><span>Comisión de pasarela</span><span>-{{ selected.fee_cents|money }}</span></div>{% endif %}
+            <div class="flex justify-between border-t border-surface-container pt-1 font-label-md text-label-md font-bold text-primary"><span>Total orden</span><span>{{ selected.total_cents|money }}</span></div>
+          </div>
+        </div>
+        <div class="flex flex-col gap-2.5">
+          <span class="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-on-surface-variant">Registro de auditoría</span>
+          <ol class="flex flex-col gap-2 rounded-xl bg-surface-container p-3 font-body-sm text-body-sm">
+            {% for label, at, glyph in selected.events %}
+              <li class="flex items-start gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-secondary"></span><div><p class="font-label-sm text-label-sm font-medium text-on-surface">{{ label }}</p><p class="text-[11px] text-on-surface-variant">{{ at.strftime('%d/%m %H:%M:%S') }}</p></div></li>
+            {% endfor %}
+          </ol>
+        </div>
+        <div class="no-print flex items-center gap-2 pt-1">
+          <button type="button" onclick="window.print()" class="btn-soft flex-1 !py-2"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">print</span>Imprimir Comanda</button>
+          <a href="{{ url_for('orders.detail', code=selected.code) }}" class="btn-soft !py-2 text-secondary" title="Ver como lo ve el cliente"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">open_in_new</span>Cliente</a>
+        </div>
+      {% else %}
+        <div class="flex flex-col items-center gap-2 py-8 text-center"><span class="material-symbols-outlined text-[36px] text-outline" aria-hidden="true">receipt</span><p class="font-body-md text-body-md text-on-surface-variant">Selecciona un pedido para ver su ticket.</p></div>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

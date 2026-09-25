@@ -17,6 +17,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# curl: el health check que Coolify (y otras plataformas) configuran desde su panel se ejecuta dentro del contenedor.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Las dependencias van primero: esta capa se reutiliza mientras requirements.txt no cambie.
 COPY requirements.txt .
 RUN pip install -r requirements.txt

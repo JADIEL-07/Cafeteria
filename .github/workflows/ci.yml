@@ -121,6 +121,7 @@ jobs:
         run: |
           docker run --rm moka-cafe sh -c 'test ! -e /app/.env && test ! -e /app/tests && test ! -e /app/.git'
           test "$(docker run --rm moka-cafe id -u)" != "0"
+          docker run --rm moka-cafe curl --version | head -1
           docker run --rm moka-cafe python -c "import gunicorn, psycopg; print('gunicorn', gunicorn.__version__, '| psycopg', psycopg.__version__)"
 
       - name: Contenedor con SQLite

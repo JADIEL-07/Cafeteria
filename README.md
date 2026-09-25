@@ -136,6 +136,29 @@ docker run -p 8000:8000 --env-file .env moka-cafe
 Para publicar: construye la imagen desde este repositorio (o conecta el repo a la plataforma, que usará el `Dockerfile`), define las variables de arriba **como secretos de la plataforma** (nunca en el código ni en la imagen) y configura el *health check* en `/healthz`, que responde 200 sólo si la app y su base de datos están vivas.
 Necesita ~512 MB de RAM (el hash de contraseñas `scrypt` usa memoria). El CI construye la imagen, la arranca contra SQLite y contra PostgreSQL y comprueba que corre sin root, sin `.env` ni tests y con RLS activado.
 
+### Publicar con Coolify
+
+Coolify ya trae su propio proxy (Traefik) con HTTPS y dominio, así que **no** uses `docker-compose.yml` (es para probar en tu PC): despliega la aplicación con el `Dockerfile`.
+
+1. **+ New → Application** y como origen el repositorio `https://github.com/JADIEL-07/Cafeteria`, rama `main` (con la *GitHub App* de Coolify se despliega solo en cada `push`).
+2. **Build Pack: Dockerfile** (ni Nixpacks ni Docker Compose), *Base Directory* `/`.
+3. **Ports Exposes: `8000`** y en **Domains** tu dominio con `https://` (el registro A del dominio ya debe apuntar al servidor).
+4. **Environment Variables** — en los secretos **desmarca** *Build Variable* / *Available at Buildtime*, para que no viajen a la construcción de la imagen:
+
+   | Variable | Valor |
+   | --- | --- |
+   | `DATABASE_URL` | la cadena de Supabase (Session pooler; funciona por IPv4) |
+   | `SECRET_KEY` | una clave larga y aleatoria (`openssl rand -hex 32`) |
+   | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | el administrador (sólo se usa si la base está vacía) |
+   | `CAFE_DEMO_DATA` | `0` |
+   | `CAFE_HTTPS` | `1` (Traefik sirve por HTTPS: cookies seguras) |
+   | `CAFE_PROXY_HOPS` | `1` (Traefik es el único proxy delante: la app ve la IP real del cliente) |
+
+5. **Health Checks:** actívalo con *Path* `/healthz` y *Port* `8000` (responde 200 sólo si la app y su base de datos están vivas). Coolify lo ejecuta con `curl` dentro del contenedor, por eso la imagen lo incluye.
+6. **Deploy.** Al terminar, abre `https://TU_DOMINIO/healthz` → `{"status":"ok"}`.
+
+No necesita volumen persistente (los datos viven en Supabase) y debe correr **una sola réplica** (el límite de intentos de login se guarda en memoria). Si el despliegue no arranca, `Logs` en Coolify muestra el motivo: lo más habitual es una `DATABASE_URL` con la contraseña sin codificar (`@ : / # ? %` van como `%40 %3A %2F %23 %3F %25`) o el error de `ADMIN_PASSWORD` que exige `CAFE_HTTPS=1` cuando la base está vacía.
+
 ## Cambios respecto a los diseños
 
 - Cada pantalla tenía una versión móvil y otra de escritorio: ahora es **una sola plantilla responsive** (barra inferior en móvil, cabecera/pie completos en escritorio).

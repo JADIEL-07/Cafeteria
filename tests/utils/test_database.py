@@ -148,7 +148,8 @@ class TestResetDbCommand:
         assert result.exit_code != 0 and "TODAS las tablas" in result.output
         assert database_name(TestConfig.SQLALCHEMY_DATABASE_URI) in result.output      # muestra a qué base apunta
         password = make_url(TestConfig.SQLALCHEMY_DATABASE_URI).password
-        assert not password or password not in result.output                          # y nunca la contraseña
+        if password:                                                                   # y nunca la contraseña (en CI vale "postgres")
+            assert f":{password}@" not in result.output and ":***@" in result.output
         assert User.get_by_email(email) is not None                                   # no se borró nada
 
     @pytest.mark.skipif(not on_postgres, reason="la confirmación sólo aplica a bases que no son SQLite")

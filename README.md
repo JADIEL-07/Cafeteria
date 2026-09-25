@@ -154,7 +154,7 @@ Coolify ya trae su propio proxy (Traefik) con HTTPS y dominio, así que **no** u
    | `CAFE_HTTPS` | `1` (Traefik sirve por HTTPS: cookies seguras) |
    | `CAFE_PROXY_HOPS` | `1` (Traefik es el único proxy delante: la app ve la IP real del cliente) |
 
-5. **Health Checks:** actívalo con *Path* `/healthz` y *Port* `8000` (responde 200 sólo si la app y su base de datos están vivas).
+5. **Health Checks:** actívalo con *Path* `/healthz` y *Port* `8000` (responde 200 sólo si la app y su base de datos están vivas). Coolify lo ejecuta con `curl` dentro del contenedor, por eso la imagen lo incluye.
 6. **Deploy.** Al terminar, abre `https://TU_DOMINIO/healthz` → `{"status":"ok"}`.
 
 No necesita volumen persistente (los datos viven en Supabase) y debe correr **una sola réplica** (el límite de intentos de login se guarda en memoria). Si el despliegue no arranca, `Logs` en Coolify muestra el motivo: lo más habitual es una `DATABASE_URL` con la contraseña sin codificar (`@ : / # ? %` van como `%40 %3A %2F %23 %3F %25`) o el error de `ADMIN_PASSWORD` que exige `CAFE_HTTPS=1` cuando la base está vacía.

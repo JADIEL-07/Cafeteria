@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+extend-exclude = ["instance", "Cafeteria", ".claude"]
+
+[tool.ruff.lint]
+# E/W: estilo básico · F: errores reales (imports sin usar, nombres indefinidos, etc.)
+select = ["E", "F", "W"]
+ignore = ["E501"]  # el largo de línea lo cuida el formato, no el linter
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]

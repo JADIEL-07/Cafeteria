@@ -93,3 +93,61 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Ejecutar pruebas contra PostgreSQL
         run: pytest
+
+  docker:
+    name: Imagen Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cafeteria
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Construir la imagen
+        run: docker build -t moka-cafe .
+
+      - name: La imagen no lleva secretos ni archivos de desarrollo
+        run: |
+          docker run --rm moka-cafe sh -c 'test ! -e /app/.env && test ! -e /app/tests && test ! -e /app/.git'
+          test "$(docker run --rm moka-cafe id -u)" != "0"
+          docker run --rm moka-cafe python -c "import gunicorn, psycopg; print('gunicorn', gunicorn.__version__, '| psycopg', psycopg.__version__)"
+
+      - name: Contenedor con SQLite
+        run: |
+          docker run -d --name moka-sqlite -p 8000:8000 -e SECRET_KEY=ci-secret-key -e ADMIN_PASSWORD=ci-admin-pass-123 -e CAFE_DEMO_DATA=0 moka-cafe
+          for i in $(seq 1 30); do curl -fsS http://localhost:8000/healthz >/dev/null 2>&1 && break; sleep 2; done
+          curl -fsS http://localhost:8000/healthz
+          curl -fsS -o /dev/null -w "menu: %{http_code}\n" http://localhost:8000/menu
+          curl -fsS -o /dev/null -w "login: %{http_code}\n" http://localhost:8000/login
+
+      - name: Contenedor contra PostgreSQL (como Supabase)
+        run: |
+          docker run -d --name moka-pg --network host -e PORT=8001 -e SECRET_KEY=ci-secret-key -e ADMIN_PASSWORD=ci-admin-pass-123 -e CAFE_DEMO_DATA=0 -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cafeteria moka-cafe
+          for i in $(seq 1 30); do curl -fsS http://localhost:8001/healthz >/dev/null 2>&1 && break; sleep 2; done
+          curl -fsS http://localhost:8001/healthz
+          curl -fsS -o /dev/null -w "menu: %{http_code}\n" http://localhost:8001/menu
+          docker exec -e PGPASSWORD=postgres $(docker ps -qf ancestor=postgres:17) psql -U postgres -d cafeteria -tAc "select count(*) filter (where relrowsecurity) || ' de ' || count(*) || ' tablas con RLS' from pg_class where relkind = 'r' and relnamespace = 'public'::regnamespace"
+
+      - name: En producción hay que definir ADMIN_PASSWORD
+        run: |
+          if docker run --rm -e SECRET_KEY=x -e CAFE_HTTPS=1 -e DATABASE_URL=sqlite:////tmp/x.db moka-cafe python -c "import run" > guard.txt 2>&1; then
+            echo "Debió negarse a crear el admin con la contraseña por defecto"; exit 1
+          fi
+          grep -q ADMIN_PASSWORD guard.txt
+
+      - name: Logs de los contenedores
+        if: always()
+        run: |
+          docker logs moka-sqlite || true
+          docker logs moka-pg || true

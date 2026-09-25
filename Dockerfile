@@ -7,7 +7,7 @@
 #
 # La configuración (DATABASE_URL de Supabase, SECRET_KEY, ADMIN_PASSWORD…) entra por variables de entorno:
 # el archivo .env NUNCA se copia a la imagen (ver .dockerignore).
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

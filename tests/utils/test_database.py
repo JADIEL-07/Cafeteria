@@ -1,6 +1,7 @@
 """Capa de base de datos: cadenas de Supabase, opciones del pool, arranque idempotente y RLS."""
 import pytest
 from sqlalchemy import inspect, select, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 from app.config import Config, TestConfig
@@ -126,7 +127,9 @@ class TestResetDbCommand:
     """``flask reset-db`` borra todo: en bases remotas (Supabase) pide confirmación."""
 
     def run(self, app, *args, **kwargs):
-        db.session.expunge_all()          # el reset reutiliza los ids: que la sesión no conserve objetos viejos
+        # El reset reutiliza los ids y, en PostgreSQL, DROP TABLE espera a que nadie tenga la tabla en uso:
+        # se cierra la sesión de la prueba (como en la CLI real, que arranca sin transacciones abiertas).
+        db.session.remove()
         return app.test_cli_runner().invoke(args=["reset-db", "--no-demo", *args], **kwargs)
 
     @pytest.mark.skipif(on_postgres, reason="con PostgreSQL siempre pide confirmación")
@@ -140,11 +143,13 @@ class TestResetDbCommand:
 
     @pytest.mark.skipif(not on_postgres, reason="la confirmación sólo aplica a bases que no son SQLite")
     def test_postgres_asks_first_and_aborts_by_default(self, app, client_user):
+        email = client_user.email
         result = self.run(app, input="n\n")
         assert result.exit_code != 0 and "TODAS las tablas" in result.output
-        assert "***" in result.output or "@" in result.output          # muestra a qué base apunta, sin la contraseña
-        db.session.expire_all()
-        assert User.get_by_email(client_user.email) is not None       # no se borró nada
+        assert database_name(TestConfig.SQLALCHEMY_DATABASE_URI) in result.output      # muestra a qué base apunta
+        password = make_url(TestConfig.SQLALCHEMY_DATABASE_URI).password
+        assert not password or password not in result.output                          # y nunca la contraseña
+        assert User.get_by_email(email) is not None                                   # no se borró nada
 
     @pytest.mark.skipif(not on_postgres, reason="la confirmación sólo aplica a bases que no son SQLite")
     def test_postgres_resets_when_confirmed(self, app, client_user):

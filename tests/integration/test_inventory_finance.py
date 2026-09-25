@@ -7,7 +7,7 @@ from app.models import DomainError, InventoryItem, InventoryMovement, LedgerEntr
 from app.models.inventory import MOV_ADJUSTMENT, MOV_WASTE
 from app.utils.timefmt import period_range
 
-from .conftest import ADMIN, BARISTA, CLIENT, add_to_cart, login
+from tests.helpers import ADMIN, BARISTA, CLIENT, add_to_cart, login
 
 
 def item(sku):

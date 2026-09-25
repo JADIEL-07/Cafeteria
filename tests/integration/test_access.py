@@ -11,7 +11,7 @@ from app.models import Favorite, Product, User
 from app.seed import seed_catalog
 from app.utils.throttle import login_limiter
 
-from .conftest import ADMIN, BARISTA, CLIENT, login
+from tests.helpers import ADMIN, BARISTA, CLIENT, login
 
 ADMIN_ONLY = ["/admin/cartera/", "/admin/cartera/exportar.csv", "/admin/usuarios/", "/admin/usuarios/exportar.csv"]
 STAFF_PAGES = ["/admin/pedidos", "/admin/pedidos/senal", "/admin/inventario/"]

@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from .conftest import ADMIN, CLIENT, login
+from tests.helpers import ADMIN, CLIENT, login
 
 FIELDS = [
     "product_id", "qty", "size", "temperature", "milk", "sweetness", "extras", "notes", "next", "mode", "table", "code",

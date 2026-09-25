@@ -7,3 +7,9 @@ venv/
 
 # Datos locales de la aplicación (base de datos y clave de sesión)
 instance/
+
+# Herramientas de desarrollo
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/

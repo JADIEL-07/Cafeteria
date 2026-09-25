@@ -1,5 +1,7 @@
 # Moka Café & Bakery — pedidos, inventario, usuarios y cartera
 
+[![CI](https://github.com/JADIEL-07/Cafeteria/actions/workflows/ci.yml/badge.svg)](https://github.com/JADIEL-07/Cafeteria/actions/workflows/ci.yml)
+
 Aplicación web para una cafetería sencilla, hecha con **Python + Flask** y arquitectura **MVC**.
 Las pantallas son las de tu diseño (Tailwind + Literata / Plus Jakarta Sans), ahora conectadas a una base de datos SQLite.
 
@@ -96,8 +98,13 @@ Incluye periodos (hoy / semana / mes / todo), desglose tarjeta vs efectivo, arqu
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest
+python -m pytest                              # pruebas
+python -m pytest --cov=app --cov-report=term-missing   # con cobertura
+python -m ruff check .                        # lint
 ```
+
+En cada *push* y *pull request* GitHub Actions ejecuta el lint y las pruebas en Python 3.11, 3.12 y 3.13
+(`.github/workflows/ci.yml`); Dependabot propone las actualizaciones de dependencias y de acciones.
 
 Cubren carrito y precios, flujo completo de pedidos (incluida la regla de pago), inventario, cartera, permisos por rol, CSRF, redirecciones seguras, exportaciones CSV, el renderizado de todas las pantallas y una prueba de robustez que golpea cada ruta con datos basura (ninguna puede dar error 500).
 

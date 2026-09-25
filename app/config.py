@@ -12,6 +12,16 @@ from .database import engine_options, normalize_database_url
 
 load_dotenv()  # lee el archivo .env si existe (las variables ya definidas en el entorno tienen prioridad)
 
+DEFAULT_ADMIN_PASSWORD = "admin1234"
+
+
+def _int_env(name, default=0):
+    """Entero no negativo desde una variable de entorno; si no es válido, ``default``."""
+    try:
+        return max(int(os.environ.get(name, default)), 0)
+    except ValueError:
+        return default
+
 
 class Config:
     # --- Infraestructura -------------------------------------------------
@@ -25,6 +35,9 @@ class Config:
     TEMPLATES_AUTO_RELOAD = True  # editar una vista y refrescar, sin reiniciar el servidor
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SECURE = os.environ.get("CAFE_HTTPS") == "1"  # activar al servir por HTTPS
+    # Cuántos proxies de confianza hay delante (nginx, balanceador de la plataforma…): así la app ve la IP y el
+    # esquema reales del cliente en lugar de los del proxy. 0 = sin proxy.
+    PROXY_HOPS = _int_env("CAFE_PROXY_HOPS")
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     WTF_CSRF_TIME_LIMIT = None
@@ -40,7 +53,7 @@ class Config:
     SEED_ON_FIRST_RUN = True
     DEMO_DATA = os.environ.get("CAFE_DEMO_DATA", "1") == "1"
     ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@moka.com")
-    ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin1234")
+    ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
 
     # --- Datos del local (se muestran en cabeceras y pies de página) -------
     CAFE = {
@@ -65,6 +78,11 @@ class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = normalize_database_url(os.environ.get("TEST_DATABASE_URL") or "sqlite://")
     SQLALCHEMY_ENGINE_OPTIONS = engine_options(SQLALCHEMY_DATABASE_URI)
     SECRET_KEY = "test-secret-key"
+    # Los valores de los que dependen las pruebas se fijan aquí: el .env de cada persona no debe cambiar su resultado.
+    ADMIN_EMAIL = "admin@moka.com"
+    ADMIN_PASSWORD = DEFAULT_ADMIN_PASSWORD
+    SESSION_COOKIE_SECURE = False
+    PROXY_HOPS = 0
     WTF_CSRF_ENABLED = False
     PASSWORD_HASH_METHOD = "pbkdf2:sha256:1000"  # barato: acelera la suite; los hashes siguen siendo válidos
     SEED_ON_FIRST_RUN = False

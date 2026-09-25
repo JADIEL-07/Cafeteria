@@ -9,9 +9,11 @@ from pathlib import Path
 
 import click
 from flask import Flask, abort, g, jsonify, render_template, request
+from sqlalchemy import text
 from sqlalchemy.exc import DataError
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-from .config import Config
+from .config import DEFAULT_ADMIN_PASSWORD, Config
 from .database import init_database, seed_once
 from .extensions import csrf, db
 from .utils import timefmt
@@ -40,6 +42,10 @@ def create_app(config_object=Config):
     if not app.config.get("SECRET_KEY"):
         app.config["SECRET_KEY"] = _load_or_create_secret(app.instance_path)
 
+    if app.config.get("PROXY_HOPS"):
+        hops = app.config["PROXY_HOPS"]
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+
     db.init_app(app)
     csrf.init_app(app)
 
@@ -48,6 +54,7 @@ def create_app(config_object=Config):
     _register_request_hooks(app)
     _register_template_helpers(app)
     _register_error_handlers(app)
+    _register_health_check(app)
 
     from .controllers import register_blueprints
     from .utils.params import SafeIntegerConverter
@@ -61,12 +68,32 @@ def create_app(config_object=Config):
         if app.config.get("SEED_ON_FIRST_RUN"):
             from .seed import seed_database
 
-            if seed_once(lambda: seed_database(demo=app.config.get("DEMO_DATA", True))):
+            def seed():
+                if app.config["SESSION_COOKIE_SECURE"] and app.config["ADMIN_PASSWORD"] == DEFAULT_ADMIN_PASSWORD:
+                    raise RuntimeError(
+                        "Con CAFE_HTTPS=1 (producción) hay que definir ADMIN_PASSWORD: no se crea el administrador "
+                        "con la contraseña por defecto."
+                    )
+                seed_database(demo=app.config.get("DEMO_DATA", True))
+
+            if seed_once(seed):
                 app.logger.warning(
                     "Base de datos creada. Administrador: %s. Si no definiste ADMIN_PASSWORD, cambia la contraseña por defecto.",
                     app.config["ADMIN_EMAIL"],
                 )
     return app
+
+
+def _register_health_check(app):
+    @app.get("/healthz")
+    def healthz():
+        """Para Docker y balanceadores: responde 200 si la app y su base de datos están vivas."""
+        try:
+            db.session.execute(text("SELECT 1"))
+        except Exception:  # cualquier fallo de la base = no está lista
+            db.session.rollback()
+            return jsonify(status="error"), 503
+        return jsonify(status="ok")
 
 
 def _register_request_hooks(app):
